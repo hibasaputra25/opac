@@ -34,9 +34,7 @@ export default async function PublicLayout({ children }: { children: React.React
               <div className="space-y-1">
                 <Link href="/katalog" className="block hover:text-primary-500">Daftar Koleksi</Link>
                 <Link href="/lokasi" className="block hover:text-primary-500">Lokasi Perpustakaan</Link>
-                <a href="https://ols.mercubuana.ac.id" className="block hover:text-primary-500">
-                  OLS UMB
-                </a>
+                <Link href="/usul-buku" className="block hover:text-primary-500">Usul Buku</Link>
               </div>
               <div className="space-y-1">
                 <Link href="/usul-buku" className="block hover:text-primary-500">Usul Buku</Link>

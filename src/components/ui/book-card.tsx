@@ -6,6 +6,11 @@ type Props = {
   authors?: string | null;
   subjects?: string | null;
   year?: number | null;
+  /** Nama kolom dari query (snake_case). */
+  cover_url?: string | null;
+  cover_width?: number | null;
+  cover_height?: number | null;
+  /** Alias camelCase untuk kompatibilitas. */
   coverUrl?: string | null;
   availableCount?: number;
   totalCount?: number;
@@ -38,30 +43,91 @@ function tone(seed: number) {
 }
 
 /**
+ * Lebar/tinggi area sampul.
+ *
+ * Rasio asli berkas gambar dipakai apa adanya supaya sampul tidak menyisakan
+ * ruang kosong, tetapi dibatasi agar tidak merusak grid: rasio sangat lebar
+ * (mis. 1,9:1) akan membuat kartu pendek dan melebar, sedangkan sampul yang
+ * sangat jangkung membuat satu kartu mendominasi kolom.
+ *
+ * Batas diambil dari sebaran data: 94% sampul berada di 0,63–1,00, median 0,70.
+ */
+export const RATIO_MIN = 0.62;
+export const RATIO_MAX = 1.12;
+
+/** Rasio sampul yang dipakai untuk buku tanpa gambar sampul. */
+export const RATIO_FALLBACK = 3 / 4;
+
+/**
+ * Lebar/tinggi area sampul untuk satu buku. Diekspor agar pengatur tata letak
+ * (mis. CatalogGrid) bisa menghitung tinggi kartu tanpa mencbak.
+ */
+export function coverAspectRatio(book: {
+  cover_width?: number | null;
+  cover_height?: number | null;
+}) {
+  const w = book.cover_width ?? 0;
+  const h = book.cover_height ?? 0;
+  const raw = w > 0 && h > 0 ? w / h : RATIO_FALLBACK;
+  return Math.min(RATIO_MAX, Math.max(RATIO_MIN, raw));
+}
+
+/**
+ * Tinggi total kartu dalam piksel bila lebarnya `width` piksel.
+ *
+ * Angka 68 px adalah tinggi blok keterangan (padding, judul, pengarang, baris
+ * tahun) menurut literal ukuran di bawah; galat ±beberapa piksel tidak masalah
+ * karena hanya dipakai untuk menyeimbangkan kolom.
+ */
+export function estimateCardHeight(
+  book: {
+    title?: string | null;
+    subjects?: string | null;
+    cover_width?: number | null;
+    cover_height?: number | null;
+  },
+  width: number,
+) {
+  const cover = width / coverAspectRatio(book);
+  const hasSubject = Boolean(book.subjects?.split(' ; ').filter(Boolean)[0]);
+  const titleLines = Math.min(2, Math.max(1, Math.ceil((book.title ?? '').length / 42)));
+  return cover + 68 + (hasSubject ? 24 : 0) + (titleLines - 1) * 18;
+}
+
+/**
  * Kartu koleksi adaptif (pola katalog Jaklitera).
- * Tinggi kartu mengikuti panjang judul; tidak pernah dipaksa memanjang.
+ *
+ * Tinggi area sampul mengikuti rasio asli gambar sampul (lihat `coverRatio`),
+ * sehingga setiap kartu punya tinggi berbeda. Buku tanpa sampul memakai rasio
+ * 3:4 standar.
  */
 export function BookCard({ book }: { book: Props }) {
   const [from, to] = tone(book.id);
   const subject = book.subjects?.split(' ; ').filter(Boolean)[0] ?? null;
   const available = book.availableCount ?? 0;
   const total = book.totalCount ?? 0;
+  const cover = book.cover_url ?? book.coverUrl ?? null;
+  const ratio = coverAspectRatio(book);
 
   return (
     <Link
       href={`/koleksi/${book.id}`}
       className="group block w-full overflow-hidden rounded-lg border border-gray-200 bg-white transition duration-200 hover:border-primary-300 hover:shadow-lift"
     >
-      {/* Sampul */}
+      {/* Sampul — tinggi mengikuti rasio asli gambar */}
       <div
-        className="relative aspect-[3/4] w-full overflow-hidden bg-gray-100"
+        className="relative w-full overflow-hidden bg-gray-100"
+        style={{ aspectRatio: `${ratio}` }}
       >
-        {book.coverUrl ? (
+        {cover ? (
+          // Sampul asli dari katalog, ditampilkan penuh tanpa terpotong.
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={book.coverUrl}
+            src={cover}
             alt={`Sampul ${book.title}`}
             loading="lazy"
+            decoding="async"
+            referrerPolicy="no-referrer"
             className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
           />
         ) : (

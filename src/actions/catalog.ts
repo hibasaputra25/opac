@@ -9,8 +9,7 @@ export type ActionState = { ok: boolean; message: string } | null;
 
 /**
  * OPAC ini bersifat baca-saja untuk koleksi.
- * Peminjaman/pengembalian dilakukan di sistem sirkulasi OLS
- * (https://ols.mercubuana.ac.id), bukan di sini.
+ * Peminjaman dan pengembalian dicatat oleh pustakawan di meja layanan.
  */
 export async function toggleFavorite(bookId: number): Promise<ActionState> {
   const user = await getCurrentUser();

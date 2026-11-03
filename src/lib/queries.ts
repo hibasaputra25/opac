@@ -9,6 +9,8 @@ export type BookListItem = {
   edition: string | null;
   language: string | null;
   cover_url: string | null;
+  cover_width: number | null;
+  cover_height: number | null;
   publisher: string | null;
   category: string | null;
   authors: string | null;
@@ -43,7 +45,7 @@ function hydrateBooks(ids: number[]): BookListItem[] {
   const placeholders = ids.map(() => '?').join(',');
   const rows = all<BookListItem>(
     `SELECT b.id, b.title, b.call_number, b.isbn, b.year, b.edition, b.language,
-            b.cover_url,
+            b.cover_url, b.cover_width, b.cover_height,
             p.name AS publisher,
             c.name AS category,
             (SELECT group_concat(a.name, ' ; ')
@@ -139,21 +141,29 @@ function buildWhere(params: SearchParams, exclude?: keyof SearchParams) {
   return { sql: clauses.length ? `WHERE ${clauses.join(' AND ')}` : '', args };
 }
 
+/**
+ * Koleksi yang punya sampul asli diutamakan agar daftar terlihat lebih hidup.
+ * Urutan ini hanya berlaku untuk daftar penelusuran (bukan hasil pencarian
+ * kata kunci, yang tetap mengikuti relevansi).
+ */
+const HAS_COVER = "(b.cover_url IS NOT NULL AND b.cover_url != '') DESC";
+
 function orderBy(params: SearchParams) {
   switch (params.sort) {
     case 'title':
-      return 'ORDER BY b.title COLLATE NOCASE ASC';
+      return `ORDER BY ${HAS_COVER}, b.title COLLATE NOCASE ASC`;
     case 'year_desc':
-      return 'ORDER BY b.year DESC NULLS LAST, b.title ASC';
+      return `ORDER BY ${HAS_COVER}, b.year DESC NULLS LAST, b.title ASC`;
     case 'year_asc':
-      return 'ORDER BY b.year ASC NULLS LAST, b.title ASC';
+      return `ORDER BY ${HAS_COVER}, b.year ASC NULLS LAST, b.title ASC`;
     case 'newest':
-      return 'ORDER BY b.id DESC';
+      return `ORDER BY ${HAS_COVER}, b.id DESC`;
     default:
       if (params.q && ftsQuery(params.q)) {
-        return 'ORDER BY (SELECT rank FROM books_fts WHERE rowid = b.id) ASC, b.title ASC';
+        // Pencarian kata kunci: utamakan relevansi, sampul hanya jadi pemecah seri.
+        return `ORDER BY (SELECT rank FROM books_fts WHERE rowid = b.id) ASC, ${HAS_COVER}, b.title ASC`;
       }
-      return 'ORDER BY b.id DESC';
+      return `ORDER BY ${HAS_COVER}, b.id DESC`;
   }
 }
 

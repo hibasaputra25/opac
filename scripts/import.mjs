@@ -253,7 +253,7 @@ function main() {
         clean(detail?.origin) || null,
         categoryId,
         clean(detail?.synopsis) || null,
-        detail?.cover_url ?? null,
+        clean(detail?.cover_url)?.replace('http://', 'https://') ?? null,
         'Buku',
       );
       const bookId = result.id;

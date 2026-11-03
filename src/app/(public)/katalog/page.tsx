@@ -32,7 +32,7 @@ export default async function CatalogPage({
 }) {
   const raw = await searchParams;
   const query = parseCatalogParams(raw);
-  const perPage = 16;
+  const perPage = 32;
 
   const result = searchBooks({ ...query, perPage });
   const facets = getFacets(query);
@@ -92,7 +92,7 @@ export default async function CatalogPage({
       </div>
 
       {/* Hasil */}
-      <div className="mt-4">
+      <div id="hasil" className="mt-4 scroll-mt-20">
         {result.rows.length ? (
           <>
             <CatalogGrid books={result.rows} />

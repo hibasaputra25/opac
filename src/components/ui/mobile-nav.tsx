@@ -6,6 +6,7 @@ import { useState } from 'react';
 
 const ICON = 'h-5 w-5';
 
+/** Taskbar bawah: hanya 5 menu utama. Aktivitas lewat menu hamburger. */
 const BOTTOM = [
   {
     href: '/',
@@ -41,22 +42,13 @@ const BOTTOM = [
     icon: (
       <svg viewBox="0 0 24 24" className={ICON} fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
         <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H19v16H6.5A2.5 2.5 0 0 0 4 21.5z" />
+        <path d="m9 11 2 2 4-4" />
       </svg>
     ),
   },
   {
-    href: '/akun/aktivitas',
-    label: 'Aktivitas',
-    icon: (
-      <svg viewBox="0 0 24 24" className={ICON} fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="12" cy="12" r="9" />
-        <path d="M12 7v5l3 2" />
-      </svg>
-    ),
-  },
-  {
-    href: '/akun',
-    label: 'Akun',
+    href: '/akun/profil',
+    label: 'Profil',
     icon: (
       <svg viewBox="0 0 24 24" className={ICON} fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="8" r="3.6" />
@@ -65,6 +57,19 @@ const BOTTOM = [
     ),
   },
 ];
+
+const MENU = [
+  ['/', 'Beranda'],
+  ['/katalog', 'Daftar Koleksi'],
+  ['/akun/keranjang', 'Keranjang'],
+  ['/akun/peminjaman', 'Peminjaman'],
+  ['/akun/aktivitas', 'Aktivitas'],
+  ['/akun/favorit', 'Buku Favorit'],
+  ['/akun/profil', 'Profil'],
+  ['/lokasi', 'Lokasi'],
+  ['/usul-buku', 'Usul Buku'],
+  ['/panduan', 'Panduan'],
+] as const;
 
 export function MobileHeader() {
   const [open, setOpen] = useState(false);
@@ -83,7 +88,9 @@ export function MobileHeader() {
             />
           </span>
           <span className="leading-tight">
-            <span className="block text-sm font-extrabold tracking-tight text-gray-900">OPAC</span>
+            <span className="block text-sm font-extrabold tracking-tight text-gray-900">
+              Katalog Online
+            </span>
             <span className="block text-[0.58rem] font-medium text-gray-500">
               Universitas Mercu Buana
             </span>
@@ -93,7 +100,7 @@ export function MobileHeader() {
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
-          className="ml-auto rounded-xl p-2 text-gray-600"
+          className="ml-auto rounded-lg p-2 text-gray-600"
           aria-expanded={open}
           aria-label="Menu"
         >
@@ -114,26 +121,16 @@ export function MobileHeader() {
               name="q"
               type="search"
               placeholder="Cari judul, pengarang, ISBN"
-              className="block w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm"
+              className="block w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm"
             />
           </form>
           <div className="grid grid-cols-2 gap-2 text-sm">
-            {[
-              ['/katalog', 'Daftar Koleksi'],
-              ['/lokasi', 'Lokasi Perpustakaan'],
-              ['/usul-buku', 'Usul Buku'],
-              ['/panduan', 'Panduan'],
-              ['/akun/peminjaman', 'Peminjaman'],
-              ['/akun/reservasi', 'Reservasi'],
-              ['/akun/aktivitas', 'Aktivitas'],
-              ['/akun/favorit', 'Buku Favorit'],
-              ['/akun/profil', 'Profil'],
-            ].map(([href, label]) => (
+            {MENU.map(([href, label]) => (
               <Link
                 key={href}
                 href={href}
                 onClick={() => setOpen(false)}
-                className="rounded-xl border border-gray-200 px-3 py-2 text-gray-600"
+                className="rounded-lg border border-gray-200 px-3 py-2 text-gray-600"
               >
                 {label}
               </Link>
@@ -148,19 +145,20 @@ export function MobileHeader() {
 export function BottomNav() {
   const pathname = usePathname();
   const isActive = (href: string) =>
-    href === '/' ? pathname === '/' : pathname.startsWith(href);
+    href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`);
 
   return (
-    <section className="fixed inset-x-0 bottom-0 z-10 border-t-2 border-gray-200 bg-white lg:hidden">
-      <div className="grid grid-cols-6">
+    <section className="fixed inset-x-0 bottom-0 z-10 border-t border-gray-200 bg-white lg:hidden">
+      <div className="grid grid-cols-5">
         {BOTTOM.map((item) => {
           const active = isActive(item.href);
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={`flex flex-col items-center gap-1 py-2 text-[0.65rem] ${
-                active ? 'text-primary-500' : 'text-gray-500'
+              aria-current={active ? 'page' : undefined}
+              className={`flex flex-col items-center gap-1 py-2 text-[0.62rem] ${
+                active ? 'font-semibold text-primary-600' : 'text-gray-500'
               }`}
             >
               {item.icon}

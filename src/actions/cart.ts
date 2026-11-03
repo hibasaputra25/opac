@@ -3,41 +3,41 @@
 import { revalidatePath } from 'next/cache';
 import { getCurrentUser } from '@/lib/auth';
 import { getDb, one, run } from '@/lib/db';
-import { HOLD_DAYS, MAX_ACTIVE, expireReservations } from '@/lib/reservations';
+import { CART_HOLD_DAYS, CART_MAX_ITEMS, expireCartItems } from '@/lib/cart';
 
-export type ReserveState = { ok: boolean; message: string } | null;
+export type CartState = { ok: boolean; message: string } | null;
 
 /**
- * Membuat reservasi untuk satu eksemplar.
+ * Menambahkan satu eksemplar ke keranjang anggota.
  *
  * Seluruh proses berjalan dalam satu transaksi `BEGIN IMMEDIATE` agar dua
- * anggota yang menekan tombol bersamaan tidak bisa memesan eksemplar terakhir
+ * anggota yang menekan tombol bersamaan tidak bisa mengambil eksemplar terakhir
  * yang sama.
  */
-export async function reserveBook(bookId: number): Promise<ReserveState> {
+export async function addToCart(bookId: number): Promise<CartState> {
   const user = await getCurrentUser();
   if (!user) return { ok: false, message: 'Silakan masuk terlebih dahulu.' };
   if (user.role !== 'member') {
-    return { ok: false, message: 'Reservasi hanya tersedia untuk akun anggota.' };
+    return { ok: false, message: 'Keranjang hanya tersedia untuk akun anggota.' };
   }
 
-  expireReservations();
+  expireCartItems();
 
   const db = getDb();
   db.exec('BEGIN IMMEDIATE');
   try {
-    // 1. Batas reservasi aktif
+    // 1. Batas isi keranjang
     const active =
       one<{ n: number }>(
         `SELECT count(*) AS n FROM reservations WHERE user_id = ? AND status = 'active'`,
         [user.id],
       )?.n ?? 0;
 
-    if (active >= MAX_ACTIVE) {
+    if (active >= CART_MAX_ITEMS) {
       db.exec('ROLLBACK');
       return {
         ok: false,
-        message: `Reservasi aktif Anda sudah mencapai batas ${MAX_ACTIVE} buku.`,
+        message: `Keranjang Anda sudah penuh (maksimal ${CART_MAX_ITEMS} buku).`,
       };
     }
 
@@ -49,7 +49,7 @@ export async function reserveBook(bookId: number): Promise<ReserveState> {
     );
     if (duplicate) {
       db.exec('ROLLBACK');
-      return { ok: false, message: 'Anda sudah mereservasi judul ini.' };
+      return { ok: false, message: 'Buku ini sudah ada di keranjang Anda.' };
     }
 
     // 3. Ambil eksemplar yang benar-benar masih tersedia (atomik di dalam transaksi)
@@ -65,45 +65,45 @@ export async function reserveBook(bookId: number): Promise<ReserveState> {
       return { ok: false, message: 'Tidak ada eksemplar yang tersedia saat ini.' };
     }
 
-    // 4. Tandai eksemplar & buat reservasi
+    // 4. Tandai eksemplar & simpan di keranjang
     run(`UPDATE items SET status = 'booked' WHERE id = ? AND status = 'available'`, [item.id]);
     run(
       `INSERT INTO reservations (user_id, book_id, item_id, status, expires_at)
        VALUES (?, ?, ?, 'active', datetime('now', ?))`,
-      [user.id, bookId, item.id, `+${HOLD_DAYS} days`],
+      [user.id, bookId, item.id, `+${CART_HOLD_DAYS} days`],
     );
 
     db.exec('COMMIT');
   } catch (err) {
     db.exec('ROLLBACK');
     const message = err instanceof Error ? err.message : 'Terjadi kesalahan.';
-    return { ok: false, message: `Gagal membuat reservasi: ${message}` };
+    return { ok: false, message: `Gagal menambahkan ke keranjang: ${message}` };
   }
 
   revalidatePath(`/koleksi/${bookId}`);
-  revalidatePath('/akun/reservasi');
+  revalidatePath('/akun/keranjang');
   revalidatePath('/katalog');
 
   return {
     ok: true,
-    message: `Reservasi berhasil. Ambil buku dalam ${HOLD_DAYS} hari di meja layanan.`,
+    message: `Ditambahkan ke keranjang. Ambil buku dalam ${CART_HOLD_DAYS} hari di meja layanan.`,
   };
 }
 
-/** Membatalkan reservasi milik sendiri. */
-export async function cancelReservation(reservationId: number): Promise<ReserveState> {
+/** Mengeluarkan satu buku dari keranjang milik sendiri. */
+export async function removeFromCart(cartItemId: number): Promise<CartState> {
   const user = await getCurrentUser();
   if (!user) return { ok: false, message: 'Silakan masuk terlebih dahulu.' };
 
   const row = one<{ id: number; item_id: number; book_id: number; status: string }>(
     `SELECT id, item_id, book_id, status FROM reservations
       WHERE id = ? AND user_id = ?`,
-    [reservationId, user.id],
+    [cartItemId, user.id],
   );
 
-  if (!row) return { ok: false, message: 'Reservasi tidak ditemukan.' };
+  if (!row) return { ok: false, message: 'Buku tidak ditemukan di keranjang.' };
   if (row.status !== 'active') {
-    return { ok: false, message: 'Reservasi ini sudah tidak aktif.' };
+    return { ok: false, message: 'Buku ini sudah tidak ada di keranjang.' };
   }
 
   const db = getDb();
@@ -117,12 +117,12 @@ export async function cancelReservation(reservationId: number): Promise<ReserveS
   } catch (err) {
     db.exec('ROLLBACK');
     const message = err instanceof Error ? err.message : 'Terjadi kesalahan.';
-    return { ok: false, message: `Gagal membatalkan: ${message}` };
+    return { ok: false, message: `Gagal mengeluarkan dari keranjang: ${message}` };
   }
 
-  revalidatePath('/akun/reservasi');
+  revalidatePath('/akun/keranjang');
   revalidatePath(`/koleksi/${row.book_id}`);
   revalidatePath('/katalog');
 
-  return { ok: true, message: 'Reservasi dibatalkan.' };
+  return { ok: true, message: 'Buku dikeluarkan dari keranjang.' };
 }

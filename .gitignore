@@ -44,3 +44,7 @@ next-env.d.ts
 /data/*.db
 /data/*.db-*
 /data/scrape/
+
+# Log runtime & catatan sesi lokal
+start.log
+session-*.md

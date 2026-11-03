@@ -59,8 +59,8 @@ const NAV: NavItem[] = [
     ),
   },
   {
-    href: '/akun/reservasi',
-    label: 'Reservasi',
+    href: '/akun/keranjang',
+    label: 'Keranjang',
     auth: true,
     icon: icon(
       <>

@@ -61,6 +61,9 @@ CREATE TABLE IF NOT EXISTS books (
   description     TEXT,
   abstract        TEXT,
   cover_url       TEXT,
+  -- Dimensi asli sampul, dipakai untuk menyesuaikan tinggi kartu di katalog.
+  cover_width     INTEGER,
+  cover_height    INTEGER,
   collection_type TEXT NOT NULL DEFAULT 'Buku',  -- Buku | Tugas Akhir | Artikel | Jurnal | E-Book
   digital_url     TEXT,
   created_at      TEXT NOT NULL DEFAULT (datetime('now')),

@@ -14,18 +14,30 @@ export type CirculationRow = {
 };
 
 /**
- * Riwayat peminjaman buku anggota, disalin dari OLS.
+ * Riwayat peminjaman buku anggota, disalin dari sistem perpustakaan.
  * Dicocokkan ke katalog lewat barcode agar judul bisa ditautkan.
  */
-export function getCirculationHistory(memberNo: string) {
+export function getCirculationHistory(memberNo: string, keyword?: string) {
+  const term = keyword?.trim();
+  const useFilter = Boolean(term);
+
   return all<CirculationRow>(
     `SELECT h.id, h.barcode, h.title, h.author, h.borrowed_at, h.due_at, h.returned_at,
             h.officer_in, h.officer_out,
             (SELECT i.book_id FROM items i WHERE i.barcode = h.barcode LIMIT 1) AS book_id
        FROM circulation_history h
       WHERE h.member_no = ?
+      ${
+        useFilter
+          ? `AND (h.title LIKE ? COLLATE NOCASE
+                 OR h.author LIKE ? COLLATE NOCASE
+                 OR h.barcode LIKE ? COLLATE NOCASE)`
+          : ''
+      }
       ORDER BY h.borrowed_at DESC, h.id DESC`,
-    [memberNo],
+    useFilter
+      ? [memberNo, `%${term}%`, `%${term}%`, `%${term}%`]
+      : [memberNo],
   );
 }
 

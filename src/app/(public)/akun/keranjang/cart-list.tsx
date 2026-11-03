@@ -1,13 +1,11 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { cancelReservation } from '@/actions/reservations';
+import { removeFromCart } from '@/actions/cart';
 
-export function ReservationList({ id, mode }: { id: number; mode: 'cancel' }) {
+export function CartList({ id }: { id: number }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-
-  if (mode !== 'cancel') return null;
 
   return (
     <div className="text-right">
@@ -16,7 +14,7 @@ export function ReservationList({ id, mode }: { id: number; mode: 'cancel' }) {
         disabled={pending}
         onClick={() =>
           startTransition(async () => {
-            const res = await cancelReservation(id);
+            const res = await removeFromCart(id);
             if (!res?.ok) setError(res?.message ?? 'Gagal membatalkan.');
           })
         }

@@ -2,35 +2,35 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getCurrentUser } from '@/lib/auth';
 import { LoginGate } from '@/components/login-gate';
-import { getActiveReservations, getReservations, countActiveReservations, MAX_ACTIVE, daysLeft } from '@/lib/reservations';
+import { getActiveCart, getCart, countCartItems, cartDaysLeft, CART_MAX_ITEMS } from '@/lib/cart';
 import { formatShortDate } from '@/lib/format';
-import { ReservationList } from './reservation-list';
+import { CartList } from './cart-list';
 
-export const metadata: Metadata = { title: 'Reservasi' };
+export const metadata: Metadata = { title: 'Keranjang' };
 export const dynamic = 'force-dynamic';
 
-export default async function ReservationPage() {
+export default async function CartPage() {
   const user = await getCurrentUser();
   if (!user) {
     return (
       <LoginGate
-        next="/akun/reservasi"
-        title="Reservasi"
+        next="/akun/keranjang"
+        title="Keranjang"
         description="Daftar buku yang Anda cadangkan sebelum diambil di meja layanan."
       />
     );
   }
 
-  const all = getReservations(user.id);
-  const active = getActiveReservations(user.id);
-  const used = countActiveReservations(user.id);
+  const all = getCart(user.id);
+  const active = getActiveCart(user.id);
+  const used = countCartItems(user.id);
   const history = all.filter((row) => row.status !== 'active');
 
   return (
     <div className="min-h-screen">
-      <h3 className="text-lg font-bold lg:text-xl">Reservasi</h3>
+      <h3 className="text-lg font-bold lg:text-xl">Keranjang</h3>
       <p className="mt-1 text-xs text-gray-500 lg:text-sm">
-        Cadangkan buku sebelum diambil di meja layanan. Berlaku 2 hari sejak reservasi dibuat.
+        Cadangkan buku sebelum diambil di meja layanan. Berlaku 2 hari sejak keranjang dibuat.
       </p>
 
       <div className="mt-4 space-y-4">
@@ -39,17 +39,17 @@ export default async function ReservationPage() {
           <div className="rounded-lg border border-gray-200 p-3">
             <p className="text-lg font-bold text-primary-600">
               {used}
-              <span className="text-sm font-medium text-gray-400"> / {MAX_ACTIVE}</span>
+              <span className="text-sm font-medium text-gray-400"> / {CART_MAX_ITEMS}</span>
             </p>
-            <p className="mt-0.5 text-[0.65rem] leading-tight text-gray-500">Reservasi aktif</p>
+            <p className="mt-0.5 text-[0.65rem] leading-tight text-gray-500">Isi keranjang</p>
           </div>
           <div className="rounded-lg border border-gray-200 p-3">
             <p className="text-lg font-bold text-primary-600">{history.length}</p>
-            <p className="mt-0.5 text-[0.65rem] leading-tight text-gray-500">Riwayat reservasi</p>
+            <p className="mt-0.5 text-[0.65rem] leading-tight text-gray-500">Riwayat keranjang</p>
           </div>
           <div className="col-span-2 rounded-lg border border-gray-200 border-l-[3px] border-l-accent-500 p-3 sm:col-span-1">
             <p className="text-xs leading-relaxed text-gray-600">
-              Reservasi yang tidak diambil dalam 2 hari otomatis dilepas dan bukunya tersedia kembali
+              Buku di keranjang yang tidak diambil dalam 2 hari otomatis dilepas dan bukunya tersedia kembali
               untuk pemustaka lain.
             </p>
           </div>
@@ -58,7 +58,7 @@ export default async function ReservationPage() {
         {/* Aktif */}
         <div className="overflow-hidden rounded-lg border border-gray-200">
           <div className="flex items-center justify-between border-b border-gray-200 px-4 py-2.5">
-            <h4 className="text-sm font-semibold text-gray-900">Reservasi aktif</h4>
+            <h4 className="text-sm font-semibold text-gray-900">Isi keranjang</h4>
             <span className="text-[0.65rem] text-gray-400">{active.length} buku</span>
           </div>
 
@@ -80,21 +80,21 @@ export default async function ReservationPage() {
                   </div>
                   <div className="text-right">
                     <p className="text-[0.65rem] font-semibold text-amber-700">
-                      {daysLeft(row.expires_at) === 0
+                      {cartDaysLeft(row.expires_at) === 0
                         ? 'Kedaluwarsa hari ini'
-                        : `${daysLeft(row.expires_at)} hari lagi`}
+                        : `${cartDaysLeft(row.expires_at)} hari lagi`}
                     </p>
                     <p className="text-[0.6rem] text-gray-400">
                       s/d {formatShortDate(row.expires_at)}
                     </p>
                   </div>
-                  <ReservationList id={row.id} mode="cancel" />
+                  <CartList id={row.id} />
                 </li>
               ))}
             </ul>
           ) : (
             <div className="px-4 py-10 text-center">
-              <p className="text-sm text-gray-500">Belum ada reservasi aktif.</p>
+              <p className="text-sm text-gray-500">Belum ada isi keranjang.</p>
               <Link
                 href="/katalog"
                 className="mt-3 inline-block rounded-lg bg-primary-500 px-4 py-2 text-xs font-semibold text-white hover:bg-primary-600"
@@ -109,7 +109,7 @@ export default async function ReservationPage() {
         {history.length > 0 && (
           <div className="overflow-hidden rounded-lg border border-gray-200">
             <div className="border-b border-gray-200 px-4 py-2.5">
-              <h4 className="text-sm font-semibold text-gray-900">Riwayat reservasi</h4>
+              <h4 className="text-sm font-semibold text-gray-900">Riwayat keranjang</h4>
             </div>
             <ul className="divide-y divide-gray-100">
               {history.map((row) => {
@@ -148,8 +148,8 @@ export default async function ReservationPage() {
         <div className="rounded-lg border border-gray-200 border-l-[3px] border-l-primary-500 bg-white p-4">
           <p className="text-sm font-semibold text-gray-900">Cara mengambil buku</p>
           <ol className="mt-1.5 list-decimal space-y-1 pl-4 text-xs leading-relaxed text-gray-500">
-            <li>Reservasi buku dari halaman detail koleksi.</li>
-            <li>Datang ke meja layanan maksimal 2 hari setelah reservasi.</li>
+            <li>Keranjang dari halaman detail koleksi.</li>
+            <li>Datang ke meja layanan maksimal 2 hari setelah keranjang.</li>
             <li>Sebutkan nomor anggota agar pustakawan memproses peminjaman.</li>
           </ol>
         </div>

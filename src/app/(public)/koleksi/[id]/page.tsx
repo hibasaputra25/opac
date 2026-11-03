@@ -8,8 +8,8 @@ import { isFavorite } from '@/lib/wishlist';
 import { ITEM_STATUS, statusToneClass } from '@/lib/format';
 import { FavoriteButton } from './favorite-button';
 import { ShareButton } from './share-button';
-import { ReserveButton } from './reserve-button';
-import { hasActiveReservationForBook } from '@/lib/reservations';
+import { CartButton } from './cart-button';
+import { isBookInCart } from '@/lib/cart';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,7 +39,7 @@ export default async function BookDetailPage({ params }: { params: Promise<{ id:
   const related = getRelatedBooks(bookId, 4);
   const user = await getCurrentUser();
   const favorite = user ? isFavorite(user.id, bookId) : false;
-  const reserved = user ? hasActiveReservationForBook(user.id, bookId) : false;
+  const inCart = user ? isBookInCart(user.id, bookId) : false;
 
   const grouped = items.reduce<Record<string, typeof items>>((acc, item) => {
     const key = item.location_name ?? 'Lokasi tidak diketahui';
@@ -67,33 +67,38 @@ export default async function BookDetailPage({ params }: { params: Promise<{ id:
 
   return (
     <section className="relative mb-16">
-      {/* Bar aksi mengambang */}
+      {/* Bar aksi mengambang: bagikan & favorit di kiri, keranjang di kanan */}
       <div className="fixed bottom-0 left-0 right-0 z-20 mx-auto w-full px-3 pb-3 lg:left-1/6 lg:right-1/6 lg:w-auto lg:px-0">
-        <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white/95 p-2 shadow-[0_-4px_24px_-12px_rgba(18,18,18,0.25)] backdrop-blur">
-          <div className="flex items-center gap-1">
-            <ShareButton title={book.title} />
-            {user ? (
-              <FavoriteButton bookId={book.id} initial={favorite} />
-            ) : (
-              <Link
-                href={`/akun/profil?next=/koleksi/${book.id}`}
-                className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
-              >
-                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
-                  <path d="M12 20s-7-4.4-7-9.3A4.2 4.2 0 0 1 12 7.6a4.2 4.2 0 0 1 7 3.1c0 4.9-7 9.3-7 9.3Z" />
-                </svg>
-                <span className="hidden lg:inline">Favorit</span>
-              </Link>
-            )}
-          </div>
+        <div className="rounded-xl border border-gray-200 bg-white/95 p-2 shadow-[0_-4px_24px_-12px_rgba(18,18,18,0.25)] backdrop-blur">
+          <div className="flex items-center justify-between gap-2">
+            {/* Kiri: aksi sekunder */}
+            <div className="flex shrink-0 items-center gap-1">
+              <ShareButton title={book.title} />
+              {user ? (
+                <FavoriteButton bookId={book.id} initial={favorite} />
+              ) : (
+                <Link
+                  href={`/akun/profil?next=/koleksi/${book.id}`}
+                  className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
+                >
+                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
+                    <path d="M12 20s-7-4.4-7-9.3A4.2 4.2 0 0 1 12 7.6a4.2 4.2 0 0 1 7 3.1c0 4.9-7 9.3-7 9.3Z" />
+                  </svg>
+                  <span className="hidden sm:inline">Favorit</span>
+                </Link>
+              )}
+            </div>
 
-          {/* Reservasi buku */}
-          <ReserveButton
-            bookId={book.id}
-            availableCount={availableCount}
-            isLoggedIn={Boolean(user)}
-            alreadyReserved={reserved}
-          />
+            {/* Kanan: aksi utama */}
+            <div className="min-w-0 flex-1 sm:max-w-xs">
+              <CartButton
+                bookId={book.id}
+                availableCount={availableCount}
+                isLoggedIn={Boolean(user)}
+                inCart={inCart}
+              />
+            </div>
+          </div>
         </div>
       </div>
 
@@ -124,6 +129,7 @@ export default async function BookDetailPage({ params }: { params: Promise<{ id:
             <img
               src={book.cover_url}
               alt={`Sampul ${book.title}`}
+              referrerPolicy="no-referrer"
               className="mx-auto max-h-[22rem] w-auto rounded-lg object-contain"
             />
           ) : (
@@ -227,7 +233,7 @@ export default async function BookDetailPage({ params }: { params: Promise<{ id:
         {related.length > 0 && (
           <div className="mt-6">
             <h4 className="mb-3 text-base font-bold text-gray-800 lg:text-lg">Koleksi Terkait</h4>
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
               {related.map((row) => (
                 <BookCard key={row.id} book={row} />
               ))}

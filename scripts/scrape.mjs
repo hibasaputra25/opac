@@ -245,6 +245,9 @@ function parseDetail(html, sourceId) {
   let cover = $('img[src*="file_buku"]').first().attr('src') ?? null;
   if (cover && /no_cover\.(jpg|png|gif)$/i.test(cover)) cover = null;
   if (cover && cover.startsWith('//')) cover = `https:${cover}`;
+  // Server katalog lama hanya menyajikan berkas sampul lewat HTTPS;
+  // permintaan HTTP selalu 404 sehingga gambar gagal tampil di browser.
+  if (cover && cover.startsWith('http://')) cover = cover.replace('http://', 'https://');
 
   const synopsis = clean($('textarea[name="Alamat"]').first().text()) || null;
 

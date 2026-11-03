@@ -58,7 +58,9 @@ export function buildQuery(
   }
 
   const qs = params.toString();
-  return qs ? `/katalog?${qs}` : '/katalog';
+  // Jangkar `#hasil` membuat perpindahan halaman mendarat langsung di kartu
+  // pertama, bukan di atas halaman (penting untuk tata letak masonry).
+  return qs ? `/katalog?${qs}#hasil` : '/katalog#hasil';
 }
 
 export function activeFilterCount(query: CatalogQuery) {

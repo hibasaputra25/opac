@@ -6,8 +6,6 @@ export const dynamic = 'force-dynamic';
 
 const RECOMMEND_TABS = ['Direkomendasikan', 'Manajemen', 'Ekonomi', 'Psikologi', 'Teknik'];
 
-const OLS_URL = 'https://ols.mercubuana.ac.id';
-
 export default async function HomePage() {
   const [newBooks, subjects, locations] = await Promise.all([
     Promise.resolve(getNewBooks(8)),
@@ -50,7 +48,7 @@ export default async function HomePage() {
           ))}
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 lg:gap-4">
+        <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
           {newBooks.map((book) => (
             <BookCard key={book.id} book={book} />
           ))}
@@ -63,21 +61,19 @@ export default async function HomePage() {
           <div>
             <p className="text-sm font-bold text-gray-900">Ingin meminjam buku?</p>
             <p className="mt-1 max-w-lg text-xs leading-relaxed text-gray-500">
-              OPAC ini hanya untuk menelusuri koleksi. Peminjaman dan pengembalian dilakukan melalui
-              sistem sirkulasi OLS Perpustakaan UMB.
+              Keranjang terlebih dahulu, lalu ambil di meja layanan perpustakaan dengan
+              menyebutkan nomor anggota Anda.
             </p>
           </div>
-          <a
-            href={OLS_URL}
-            target="_blank"
-            rel="noreferrer"
+          <Link
+            href="/akun/keranjang"
             className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-primary-500 px-4 py-2 text-xs font-semibold text-white hover:bg-primary-600"
           >
-            Buka OLS UMB
+            Keranjang
             <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.4">
-              <path d="M7 17 17 7M9 7h8v8" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-          </a>
+          </Link>
         </div>
       </section>
 

@@ -43,7 +43,7 @@ export default async function FavoritesPage() {
       <div className="mt-4">
         <div>
           {books.length ? (
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
               {books.map((book) => (
                 <BookCard key={book.id} book={book} />
               ))}

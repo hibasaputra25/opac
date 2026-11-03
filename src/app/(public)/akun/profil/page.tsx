@@ -5,9 +5,9 @@ import { LoginGate } from '@/components/login-gate';
 import { one } from '@/lib/db';
 import { formatDate, formatShortDate } from '@/lib/format';
 import { getCirculationHistory, getLoanSummary } from '@/lib/circ-history';
-import { countActiveReservations, MAX_ACTIVE } from '@/lib/reservations';
+import { countCartItems, CART_MAX_ITEMS } from '@/lib/cart';
 import { logout } from '@/actions/auth';
-import { ProfileForm, PasswordForm } from './forms';
+import { ProfileForm } from './forms';
 
 export const metadata: Metadata = { title: 'Profil' };
 export const dynamic = 'force-dynamic';
@@ -19,7 +19,7 @@ export default async function ProfilePage() {
       <LoginGate
         next="/akun/profil"
         title="Profil"
-        description="Ringkasan keanggotaan, data diri, dan keamanan akun."
+        description="Ringkasan keanggotaan dan data diri Anda."
       />
     );
   }
@@ -38,7 +38,7 @@ export default async function ProfilePage() {
 
   // Ringkasan keanggotaan (sebelumnya halaman terpisah)
   const summary = getLoanSummary(row.member_no ?? '');
-  const reservations = countActiveReservations(user.id);
+  const cartCount = countCartItems(user.id);
   const favorites =
     one<{ n: number }>('SELECT count(*) AS n FROM wishlists WHERE user_id = ?', [user.id])?.n ?? 0;
   const recent = row.member_no ? getCirculationHistory(row.member_no).slice(0, 3) : [];
@@ -55,7 +55,7 @@ export default async function ProfilePage() {
   };
 
   const stats = [
-    { label: 'Reservasi aktif', value: `${reservations}/${MAX_ACTIVE}`, href: '/akun/reservasi' },
+    { label: 'Isi keranjang', value: `${cartCount}/${CART_MAX_ITEMS}`, href: '/akun/keranjang' },
     { label: 'Sedang dipinjam', value: summary.active, href: '/akun/peminjaman' },
     { label: 'Total pinjam', value: summary.total, href: '/akun/peminjaman' },
     { label: 'Buku favorit', value: favorites, href: '/akun/favorit' },
@@ -65,7 +65,7 @@ export default async function ProfilePage() {
     <div className="min-h-screen">
       <h3 className="text-lg font-bold lg:text-xl">Profil</h3>
       <p className="mt-1 text-xs text-gray-500 lg:text-sm">
-        Ringkasan keanggotaan, data diri, dan keamanan akun.
+        Ringkasan keanggotaan dan data diri Anda.
       </p>
 
       <div className="mt-4 space-y-4">
@@ -160,16 +160,6 @@ export default async function ProfilePage() {
           </h4>
           <div className="p-4">
             <ProfileForm user={profile} />
-          </div>
-        </section>
-
-        {/* Keamanan */}
-        <section className="rounded-xl border border-gray-200">
-          <h4 className="border-b border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-900">
-            Keamanan Akun
-          </h4>
-          <div className="p-4">
-            <PasswordForm />
           </div>
         </section>
 

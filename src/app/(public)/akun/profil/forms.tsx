@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState } from 'react';
-import { changePassword, updateProfile } from '@/actions/auth';
+import { updateProfile } from '@/actions/auth';
 
 type State = { error?: string; success?: string } | null;
 
@@ -55,33 +55,6 @@ export function ProfileForm({
       </div>
       <button type="submit" disabled={pending} className="btn btn-primary">
         {pending ? 'Menyimpan…' : 'Simpan Perubahan'}
-      </button>
-    </form>
-  );
-}
-
-export function PasswordForm() {
-  const [state, action, pending] = useActionState(changePassword, null);
-
-  return (
-    <form action={action} className="space-y-4">
-      <Message state={state} />
-      <div>
-        <label htmlFor="cp-current" className="label">Kata Sandi Saat Ini</label>
-        <input id="cp-current" name="current" type="password" required className="field h-11" />
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <label htmlFor="cp-next" className="label">Kata Sandi Baru</label>
-          <input id="cp-next" name="next" type="password" minLength={8} required className="field h-11" />
-        </div>
-        <div>
-          <label htmlFor="cp-confirm" className="label">Ulangi Kata Sandi Baru</label>
-          <input id="cp-confirm" name="confirm" type="password" minLength={8} required className="field h-11" />
-        </div>
-      </div>
-      <button type="submit" disabled={pending} className="btn btn-outline">
-        {pending ? 'Menyimpan…' : 'Ubah Kata Sandi'}
       </button>
     </form>
   );

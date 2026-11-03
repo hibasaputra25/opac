@@ -1,9 +1,13 @@
 import Link from 'next/link';
 import { buildQuery, type CatalogQuery } from '@/lib/search-params';
 
+const CELL =
+  'relative inline-flex h-8 min-w-8 items-center justify-center gap-1 rounded-xl px-3 text-xs font-semibold transition';
+
 /**
- * Paginasi bergaya katalog besar: beberapa halaman di sekitar posisi aktif,
- * tombol lompat ke halaman pertama & terakhir, serta input nomor halaman.
+ * Paginasi katalog: 6 nomor halaman pertama + 2 nomor terakhir, dengan posisi
+ * aktif selalu terlihat. Tombol lompat ke halaman pertama/terakhir serta input
+ * nomor halaman melengkapi navigasi untuk katalog berisi ribuan halaman.
  */
 export function Pagination({
   query,
@@ -16,21 +20,43 @@ export function Pagination({
 }) {
   if (pages <= 1) return null;
 
-  const WINDOW = 2;
-  const numbers: (number | '…')[] = [];
+  // Aturan nomor halaman:
+  // - Halaman 1-3: enam halaman pertama + dua halaman terakhir.
+  // - Halaman 4+: dua halaman pertama, jendela [posisi-1, posisi, posisi+1..
+  //   posisi+3], lalu dua halaman terakhir. Jendela yang bertabrakan dengan
+  //   ekor digabung tanpa elipsis di tengah.
+  const HEAD = 6;
+  const TAIL = 2;
 
+  const wanted = new Set<number>();
+  if (page <= 3) {
+    for (let i = 1; i <= Math.min(HEAD, pages); i += 1) wanted.add(i);
+  } else {
+    wanted.add(1);
+    wanted.add(2);
+    for (let i = Math.max(1, page - 1); i <= Math.min(pages, page + 3); i += 1) wanted.add(i);
+  }
+  for (let i = Math.max(1, pages - TAIL + 1); i <= pages; i += 1) wanted.add(i);
+
+  const numbers: (number | '…')[] = [];
+  let previous = 0;
   for (let i = 1; i <= pages; i += 1) {
-    const nearCurrent = Math.abs(i - page) <= WINDOW;
-    const nearEdge = i === 1 || i === pages || Math.abs(i - 2) <= WINDOW || Math.abs(i - (pages - 1)) <= WINDOW;
-    if (nearCurrent || nearEdge) {
-      numbers.push(i);
-    } else if (numbers[numbers.length - 1] !== '…') {
-      numbers.push('…');
-    }
+    if (!wanted.has(i)) continue;
+    if (previous && i - previous > 1) numbers.push('…');
+    numbers.push(i);
+    previous = i;
   }
 
-  const cell =
-    'relative inline-flex h-8 min-w-8 items-center justify-center gap-1 rounded-xl px-3 text-xs font-semibold transition';
+  // Versi ringkas untuk layar sempit: jendela geser berisi paling banyak 4
+  // halaman — satu sebelum posisi, posisi saat ini, lalu dua berikutnya.
+  // Halaman pertama/terakhir tidak ditampilkan karena sudah tersedia tombol
+  // panah lompat di kiri-kanan.
+  const compact: (number | '…')[] = [];
+  {
+    const start = Math.max(1, Math.min(page - 1, pages - 3));
+    const end = Math.min(pages, start + 3);
+    for (let i = start; i <= end; i += 1) compact.push(i);
+  }
 
   return (
     <nav className="mt-8 flex flex-col items-center gap-3" aria-label="Navigasi halaman">
@@ -40,7 +66,7 @@ export function Pagination({
           href={buildQuery(query, { page: 1 })}
           aria-disabled={page === 1}
           aria-label="Halaman pertama"
-          className={`${cell} ${
+          className={`${CELL} ${
             page === 1
               ? 'pointer-events-none text-gray-300'
               : 'border border-gray-200 text-gray-600 hover:border-primary-300 hover:text-primary-600'
@@ -57,7 +83,7 @@ export function Pagination({
           href={buildQuery(query, { page: Math.max(1, page - 1) })}
           aria-disabled={page === 1}
           aria-label="Halaman sebelumnya"
-          className={`${cell} ${
+          className={`${CELL} ${
             page === 1
               ? 'pointer-events-none text-gray-300'
               : 'border border-gray-200 text-gray-600 hover:border-primary-300 hover:text-primary-600'
@@ -71,28 +97,9 @@ export function Pagination({
 
         <span className="mx-1 h-6 w-px bg-gray-200" aria-hidden="true" />
 
-        {/* Nomor halaman */}
-        {numbers.map((n, index) =>
-          n === '…' ? (
-            <span key={`gap-${index}`} className="px-1 text-xs text-gray-400">
-              …
-            </span>
-          ) : (
-            <Link
-              key={n}
-              href={buildQuery(query, { page: n })}
-              aria-current={n === page ? 'page' : undefined}
-              aria-label={`Halaman ${n}`}
-              className={`${cell} ${
-                n === page
-                  ? 'bg-primary-500 text-white shadow-sm'
-                  : 'border border-gray-200 text-gray-600 hover:border-primary-300 hover:text-primary-600'
-              }`}
-            >
-              {n.toLocaleString('id-ID')}
-            </Link>
-          ),
-        )}
+        {/* Nomor halaman — versi penuh (desktop) & ringkas (mobile) */}
+        <NumberList items={compact} className="flex items-center gap-1.5 sm:hidden" query={query} page={page} />
+        <NumberList items={numbers} className="hidden items-center gap-1.5 sm:flex" query={query} page={page} />
 
         <span className="mx-1 h-6 w-px bg-gray-200" aria-hidden="true" />
 
@@ -101,7 +108,7 @@ export function Pagination({
           href={buildQuery(query, { page: Math.min(pages, page + 1) })}
           aria-disabled={page === pages}
           aria-label="Halaman berikutnya"
-          className={`${cell} ${
+          className={`${CELL} ${
             page === pages
               ? 'pointer-events-none text-gray-300'
               : 'border border-gray-200 text-gray-600 hover:border-primary-300 hover:text-primary-600'
@@ -118,7 +125,7 @@ export function Pagination({
           href={buildQuery(query, { page: pages })}
           aria-disabled={page === pages}
           aria-label="Halaman terakhir"
-          className={`${cell} ${
+          className={`${CELL} ${
             page === pages
               ? 'pointer-events-none text-gray-300'
               : 'border border-gray-200 text-gray-600 hover:border-primary-300 hover:text-primary-600'
@@ -159,5 +166,44 @@ export function Pagination({
         </button>
       </form>
     </nav>
+  );
+}
+
+/** Deret nomor halaman + elipsis. */
+function NumberList({
+  items,
+  className,
+  query,
+  page,
+}: {
+  items: (number | '…')[];
+  className: string;
+  query: CatalogQuery;
+  page: number;
+}) {
+  return (
+    <div className={className}>
+      {items.map((n, index) =>
+        n === '…' ? (
+          <span key={`gap-${index}`} className="px-1 text-xs text-gray-400" aria-hidden="true">
+            …
+          </span>
+        ) : (
+          <Link
+            key={n}
+            href={buildQuery(query, { page: n })}
+            aria-current={n === page ? 'page' : undefined}
+            aria-label={`Halaman ${n}`}
+            className={`${CELL} ${
+              n === page
+                ? 'bg-primary-500 text-white shadow-sm'
+                : 'border border-gray-200 text-gray-600 hover:border-primary-300 hover:text-primary-600'
+            }`}
+          >
+            {n.toLocaleString('id-ID')}
+          </Link>
+        ),
+      )}
+    </div>
   );
 }

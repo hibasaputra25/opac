@@ -29,9 +29,9 @@ export function daysBetween(from: string | Date, to: string | Date = new Date())
 
 export const ITEM_STATUS: Record<string, { label: string; tone: string }> = {
   available: { label: 'Tersedia', tone: 'green' },
-  booked: { label: 'Direservasi', tone: 'amber' },
+  booked: { label: 'Di keranjang', tone: 'amber' },
   borrowed: { label: 'Dipinjam', tone: 'amber' },
-  reserved: { label: 'Direservasi', tone: 'amber' },
+  reserved: { label: 'Di keranjang', tone: 'amber' },
   reference: { label: 'Baca di tempat', tone: 'blue' },
   lost: { label: 'Hilang', tone: 'red' },
   damaged: { label: 'Rusak', tone: 'red' },
