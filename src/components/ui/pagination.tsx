@@ -147,6 +147,8 @@ export function Pagination({
         {query.location && <input type="hidden" name="location" value={query.location} />}
         {query.available && <input type="hidden" name="available" value="1" />}
         {query.sort && <input type="hidden" name="sort" value={query.sort} />}
+        {query.yearFrom && <input type="hidden" name="yearFrom" value={query.yearFrom} />}
+        {query.yearTo && <input type="hidden" name="yearTo" value={query.yearTo} />}
         <label htmlFor="jump-page">Ke halaman</label>
         <input
           id="jump-page"

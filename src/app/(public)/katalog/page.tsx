@@ -1,29 +1,12 @@
 import Link from 'next/link';
-import { CatalogFilters } from '@/components/ui/catalog-filters';
 import { CatalogGrid } from '@/components/ui/catalog-grid';
 import { FilterModal } from '@/components/ui/filter-modal';
 import { Pagination } from '@/components/ui/pagination';
+import { ActiveFilterChips, SubjectChips } from '@/components/ui/subject-chips';
 import { getFacets, searchBooks } from '@/lib/queries';
-import { buildQuery, parseCatalogParams, type RawSearchParams } from '@/lib/search-params';
+import { parseCatalogParams, type RawSearchParams } from '@/lib/search-params';
 
 export const dynamic = 'force-dynamic';
-
-const SORTS = [
-  { value: '', label: 'Relevan' },
-  { value: 'newest', label: 'Terbaru' },
-  { value: 'title', label: 'A-Z' },
-  { value: 'year_desc', label: 'Tahun' },
-];
-
-/**
- * Gaya chip mengikuti Jaklitera: latar transparan, border solid, hover berwarna.
- * Aktif: latar biru transparan + border solid biru UMB.
- */
-const CHIP_BASE =
-  'shrink-0 rounded-lg border py-1.5 px-3 text-xs font-medium transition';
-const CHIP_IDLE =
-  'border-gray-200 bg-gray-50 text-gray-500 hover:border-primary-500 hover:bg-primary-50 hover:text-primary-600';
-const CHIP_ACTIVE = 'border-primary-500 bg-primary-500/10 text-primary-600';
 
 export default async function CatalogPage({
   searchParams,
@@ -36,7 +19,6 @@ export default async function CatalogPage({
 
   const result = searchBooks({ ...query, perPage });
   const facets = getFacets(query);
-  const filters = <CatalogFilters query={query} facets={facets} />;
 
   return (
     <div className="min-h-screen">
@@ -61,34 +43,33 @@ export default async function CatalogPage({
             className="w-full rounded-lg border border-gray-300 bg-gray-50 py-2.5 pl-10 pr-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-primary-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-100"
           />
           {query.subject && <input type="hidden" name="subject" value={query.subject} />}
+          {query.category && <input type="hidden" name="category" value={query.category} />}
+          {query.language && <input type="hidden" name="language" value={query.language} />}
+          {query.location && <input type="hidden" name="location" value={query.location} />}
+          {query.available && <input type="hidden" name="available" value="1" />}
+          {query.sort && <input type="hidden" name="sort" value={query.sort} />}
+          {query.yearFrom && <input type="hidden" name="yearFrom" value={query.yearFrom} />}
+          {query.yearTo && <input type="hidden" name="yearTo" value={query.yearTo} />}
         </div>
       </form>
 
-      {/* Toolbar */}
+      {/* Toolbar: filter + jumlah hasil */}
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <FilterModal>{filters}</FilterModal>
-
-          <div className="no-scrollbar flex items-center gap-1 overflow-x-auto">
-            {SORTS.map((sort) => {
-              const active = (query.sort ?? '') === sort.value;
-              return (
-                <Link
-                  key={sort.value || 'relevance'}
-                  href={buildQuery(query, { sort: sort.value || undefined, page: 1 })}
-                  className={`${CHIP_BASE} ${active ? CHIP_ACTIVE : CHIP_IDLE}`}
-                >
-                  {sort.label}
-                </Link>
-              );
-            })}
-          </div>
+          <FilterModal query={query} facets={facets} />
         </div>
 
         <p className="shrink-0 text-xs text-gray-400">
           <span className="font-bold text-gray-700">{result.total.toLocaleString('id-ID')}</span>{' '}
           koleksi
         </p>
+      </div>
+
+      <ActiveFilterChips query={query} facets={facets} />
+
+      {/* Chip subjek cepat */}
+      <div className="mt-3">
+        <SubjectChips query={query} subjects={facets.subjects} />
       </div>
 
       {/* Hasil */}

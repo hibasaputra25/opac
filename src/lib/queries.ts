@@ -1,4 +1,5 @@
 import { all, one, getDb } from '@/lib/db';
+import { parseMulti } from '@/lib/search-params';
 
 export type BookListItem = {
   id: number;
@@ -97,20 +98,29 @@ function buildWhere(params: SearchParams, exclude?: keyof SearchParams) {
   }
 
   if (params.subject && exclude !== 'subject') {
-    clauses.push(`b.id IN (
-      SELECT bs.book_id FROM book_subjects bs
-      JOIN subjects s ON s.id = bs.subject_id WHERE s.slug = ?)`);
-    args.push(params.subject);
+    const slugs = parseMulti(params.subject);
+    if (slugs.length) {
+      clauses.push(`b.id IN (
+        SELECT bs.book_id FROM book_subjects bs
+        JOIN subjects s ON s.id = bs.subject_id WHERE s.slug IN (${slugs.map(() => '?').join(',')}))`);
+      args.push(...slugs);
+    }
   }
 
   if (params.category && exclude !== 'category') {
-    clauses.push('c.slug = ?');
-    args.push(params.category);
+    const slugs = parseMulti(params.category);
+    if (slugs.length) {
+      clauses.push(`c.slug IN (${slugs.map(() => '?').join(',')})`);
+      args.push(...slugs);
+    }
   }
 
   if (params.language && exclude !== 'language') {
-    clauses.push('b.language = ?');
-    args.push(params.language);
+    const langs = parseMulti(params.language);
+    if (langs.length) {
+      clauses.push(`b.language IN (${langs.map(() => '?').join(',')})`);
+      args.push(...langs);
+    }
   }
 
   if (params.type && exclude !== 'type') {
@@ -119,10 +129,13 @@ function buildWhere(params: SearchParams, exclude?: keyof SearchParams) {
   }
 
   if (params.location && exclude !== 'location') {
-    clauses.push(`b.id IN (
-      SELECT i.book_id FROM items i
-      JOIN locations l ON l.id = i.location_id WHERE l.code = ?)`);
-    args.push(params.location);
+    const codes = parseMulti(params.location);
+    if (codes.length) {
+      clauses.push(`b.id IN (
+        SELECT i.book_id FROM items i
+        JOIN locations l ON l.id = i.location_id WHERE l.code IN (${codes.map(() => '?').join(',')}))`);
+      args.push(...codes);
+    }
   }
 
   if (params.available && exclude !== 'available') {
@@ -130,12 +143,16 @@ function buildWhere(params: SearchParams, exclude?: keyof SearchParams) {
   }
 
   if (params.yearFrom) {
+    // Clamp ke rentang wajar; data sumber punya beberapa nilai salah parse
+    // (mis. "19", "2204") yang sebaiknya tidak memengaruhi filter.
+    const from = Math.max(1900, Math.min(2100, params.yearFrom));
     clauses.push('b.year >= ?');
-    args.push(params.yearFrom);
+    args.push(from);
   }
   if (params.yearTo) {
+    const to = Math.max(1900, Math.min(2100, params.yearTo));
     clauses.push('b.year <= ?');
-    args.push(params.yearTo);
+    args.push(to);
   }
 
   return { sql: clauses.length ? `WHERE ${clauses.join(' AND ')}` : '', args };
@@ -246,7 +263,16 @@ export function getFacets(params: SearchParams) {
     locationsWhere.args,
   );
 
-  return { subjects, categories, languages, locations };
+  // Baris dari node:sqlite punya null-prototype dan tidak boleh diteruskan
+  // langsung ke Client Component — salin ke objek biasa.
+  const plain = (rows: Facet[]) => rows.map((row) => ({ ...row }));
+
+  return {
+    subjects: plain(subjects),
+    categories: plain(categories),
+    languages: plain(languages),
+    locations: plain(locations),
+  };
 }
 
 export function getBook(id: number) {

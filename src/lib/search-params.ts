@@ -2,6 +2,7 @@ export type RawSearchParams = Record<string, string | string[] | undefined>;
 
 export type CatalogQuery = {
   q?: string;
+  /** Multi-pilih, dipisah koma di URL (mis. ?category=fiksi,umum). */
   subject?: string;
   category?: string;
   language?: string;
@@ -14,10 +15,19 @@ export type CatalogQuery = {
   yearTo?: number;
 };
 
+/** Pecah nilai filter multi-pilih menjadi daftar bersih & unik. */
+export function parseMulti(value: string | undefined): string[] {
+  if (!value) return [];
+  const parts = value.split(',').map((v) => v.trim()).filter(Boolean);
+  return [...new Set(parts)];
+}
+
 export function parseCatalogParams(raw: RawSearchParams): CatalogQuery {
   const get = (key: string) => {
     const value = raw[key];
-    return Array.isArray(value) ? value[0] : value;
+    // Form GET dengan checkbox multi-pilih mengirim parameter berulang
+    // (?subject=a&subject=b) — gabungkan menjadi daftar dipisah koma.
+    return Array.isArray(value) ? value.map((v) => v.trim()).filter(Boolean).join(',') : value;
   };
 
   const num = (key: string) => {
