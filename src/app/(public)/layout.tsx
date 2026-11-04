@@ -15,7 +15,10 @@ export default async function PublicLayout({ children }: { children: React.React
       <MobileHeader />
       <LeftSidebar isLoggedIn={isLoggedIn} />
 
-      <main className="mx-auto mb-16 mt-14 w-full p-4 lg:mb-0 lg:mt-0 lg:w-4/6">
+      {/* min-w-0 wajib: tanpa ini main menolak menyusut di bawah lebar minimum
+          kontennya (flex min-width:auto), meluber ke atas sidebar kanan, dan
+          membuat semua overflow-x-auto di dalamnya tidak pernah aktif. */}
+      <main className="mx-auto mb-16 mt-14 w-full min-w-0 p-4 lg:mb-0 lg:mt-0 lg:w-4/6">
         {children}
 
         <footer className="mt-12 hidden rounded-xl border border-gray-300 bg-gray-50 p-4 text-sm lg:block">

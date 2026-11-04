@@ -16,6 +16,9 @@ type Props = {
 /**
  * Daftar chip subjek di atas grid (pola Jaklitera): tautan cepat satu klik,
  * digeser horizontal bila melebihi lebar layar.
+ *
+ * Hanya 7 subjek terpopuler — baris pendek selalu muat di desktop tanpa
+ * perlu menggeser, dan pilihan lengkap tetap tersedia di modal Filter.
  */
 export function SubjectChips({ query, subjects }: { query: CatalogQuery; subjects: Facet[] }) {
   if (!subjects.length) return null;
@@ -23,7 +26,7 @@ export function SubjectChips({ query, subjects }: { query: CatalogQuery; subject
 
   return (
     <div className="no-scrollbar -mx-1 flex items-center gap-2 overflow-x-auto px-1 py-0.5">
-      {subjects.map((subject) => {
+      {subjects.slice(0, 7).map((subject) => {
         const isActive = active.includes(subject.value);
         const next = isActive
           ? active.filter((s) => s !== subject.value)
