@@ -408,7 +408,40 @@ export function searchBooks(params: SearchParams): SearchResult {
   };
 }export type Facet = { label: string; value: string; count: number };
 
+/**
+ * Facet gabungan: seluruh opsi master selalu tampil (agar mahasiswa melihat
+ * penuh pilihan filtering), dengan jumlah hasil saat ini. Opsi tanpa hasil
+ * diberi count 0 dan dinonaktifkan di UI.
+ */
+function withStaticOptions(results: Facet[], masters: { label: string; value: string }[]): Facet[] {
+  const counts = new Map(results.map((row) => [row.value, row.count]));
+  const merged = masters.map((master) => ({
+    label: master.label,
+    value: master.value,
+    count: counts.get(master.value) ?? 0,
+  }));
+  // Urutan: yang berhasi (count > 0) dulu sesuai jumlah, lalu yang nol menurut abjad.
+  return [
+    ...merged.filter((m) => m.count > 0).sort((a, b) => b.count - a.count),
+    ...merged.filter((m) => m.count === 0).sort((a, b) => a.label.localeCompare(b.label, 'id')),
+  ];
+}
+
 export function getFacets(params: SearchParams) {
+  // Daftar opsi statis dari master data — tidak dipengaruhi filter apa pun.
+  const masterSubjects = all<{ label: string; value: string }>(
+    `SELECT s.name AS label, s.slug AS value FROM subjects s ORDER BY s.name ASC`,
+  );
+  const masterCategories = all<{ label: string; value: string }>(
+    `SELECT c.name AS label, c.slug AS value FROM categories c ORDER BY c.name ASC`,
+  );
+  const masterLanguages = all<{ label: string; value: string }>(
+    `SELECT DISTINCT b.language AS label, b.language AS value FROM books b WHERE b.language IS NOT NULL ORDER BY b.language`,
+  );
+  const masterLocations = all<{ label: string; value: string }>(
+    `SELECT l.name AS label, l.code AS value FROM locations l WHERE l.is_active = 1 ORDER BY l.name`,
+  );
+
   const subjectsWhere = buildWhere(params, 'subject');
   const subjects = all<Facet>(
     `SELECT s.name AS label, s.slug AS value, count(*) AS count
@@ -417,7 +450,7 @@ export function getFacets(params: SearchParams) {
        JOIN books b ON b.id = bs.book_id
        LEFT JOIN categories c ON c.id = b.category_id
        ${subjectsWhere.sql}
-      GROUP BY s.id ORDER BY count DESC, s.name ASC LIMIT 24`,
+      GROUP BY s.id ORDER BY count DESC, s.name ASC`,
     subjectsWhere.args,
   );
 
@@ -426,7 +459,7 @@ export function getFacets(params: SearchParams) {
     `SELECT c.name AS label, c.slug AS value, count(*) AS count
        FROM categories c JOIN books b ON b.category_id = c.id
        ${categoriesWhere.sql}
-      GROUP BY c.id ORDER BY count DESC, c.name ASC LIMIT 16`,
+      GROUP BY c.id ORDER BY count DESC, c.name ASC`,
     categoriesWhere.args,
   );
 
@@ -435,7 +468,7 @@ export function getFacets(params: SearchParams) {
     `SELECT b.language AS label, b.language AS value, count(*) AS count
        FROM books b LEFT JOIN categories c ON c.id = b.category_id
        ${languagesWhere.sql} ${languagesWhere.sql ? 'AND' : 'WHERE'} b.language IS NOT NULL
-      GROUP BY b.language ORDER BY count DESC LIMIT 8`,
+      GROUP BY b.language ORDER BY count DESC`,
     languagesWhere.args,
   );
 
@@ -460,11 +493,22 @@ export function getFacets(params: SearchParams) {
   // langsung ke Client Component — salin ke objek biasa.
   const plain = (rows: Facet[]) => rows.map((row) => ({ ...row }));
 
+  // Subjek berjumlah 11 ribuan — mengirim semuanya (termasuk count-0)
+  // membengkakkan payload HTML ke ~9 MB. Kirim 40 teratas berisi + opsi yang
+  // sedang dipilih (agar tetap tampil tercentang), sisanya tidak pernah
+  // terlihat di UI karena tidak pernah masuk 40 besar.
+  const chosenSubjects = parseMulti(params.subject);
+  const subjectList = plain(withStaticOptions(subjects, masterSubjects));
+  const subjectsShown = [
+    ...subjectList.filter((s) => s.count > 0).slice(0, 40),
+    ...subjectList.filter((s) => s.count === 0 && chosenSubjects.includes(s.value)),
+  ];
+
   return {
-    subjects: plain(subjects),
-    categories: plain(categories),
-    languages: plain(languages),
-    locations: plain(locations),
+    subjects: subjectsShown,
+    categories: plain(withStaticOptions(categories, masterCategories)),
+    languages: plain(withStaticOptions(languages, masterLanguages)),
+    locations: plain(withStaticOptions(locations, masterLocations)),
   };
 }
 

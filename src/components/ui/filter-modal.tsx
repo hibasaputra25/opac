@@ -84,13 +84,16 @@ export function FilterModal({ query, facets }: Props) {
                 checked={checkedCategories}
               />
 
-              {/* Subjek — checkbox multi-pilih */}
+              {/* Subjek — checkbox multi-pilih.
+                  Subjek berjumlah 11 ribuan sehingga hanya 30 teratas yang
+                  ditampilkan; selalu diawali yang punya hasil pada pencarian
+                  saat ini agar opsi relevan tidak tersembunyi. */}
               <CheckboxGroup
                 title="Saring Subjek"
                 name="subject"
                 items={facets.subjects}
                 checked={checkedSubjects}
-                limit={12}
+                limit={30}
               />
 
               {/* Lokasi — checkbox multi-pilih */}
@@ -101,19 +104,22 @@ export function FilterModal({ query, facets }: Props) {
                 checked={checkedLocations}
               />
 
-              {/* Bahasa — dropdown */}
+              {/* Bahasa — checkbox chip */}
               <div>
                 <p className="mb-2 text-sm font-medium text-gray-900">Saring Bahasa</p>
                 <div className="flex flex-wrap gap-1.5">
                   {facets.languages.map((language) => {
                     const checked = checkedLanguages.includes(language.value);
+                    const disabled = language.count === 0 && !checked;
                     return (
                       <label
                         key={language.value}
-                        className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg border py-1.5 px-3 text-xs font-medium transition ${
+                        className={`inline-flex items-center gap-1.5 rounded-lg border py-1.5 px-3 text-xs font-medium transition ${
                           checked
                             ? 'border-primary-500 bg-primary-500/10 text-primary-600'
-                            : 'border-gray-200 bg-gray-50 text-gray-500 hover:border-primary-400'
+                            : disabled
+                              ? 'cursor-not-allowed border-gray-100 bg-gray-50 text-gray-300'
+                              : 'cursor-pointer border-gray-200 bg-gray-50 text-gray-500 hover:border-primary-400'
                         }`}
                       >
                         <input
@@ -121,10 +127,13 @@ export function FilterModal({ query, facets }: Props) {
                           name="language"
                           value={language.value}
                           defaultChecked={checked}
-                          className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                          disabled={disabled}
+                          className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 disabled:opacity-40"
                         />
                         {language.label}
-                        <span className="text-gray-400">{language.count.toLocaleString('id-ID')}</span>
+                        <span className={disabled ? 'text-gray-300' : 'text-gray-400'}>
+                          {language.count.toLocaleString('id-ID')}
+                        </span>
                       </label>
                     );
                   })}
@@ -216,25 +225,38 @@ function CheckboxGroup({
   limit?: number;
 }) {
   if (!items.length) return null;
+  // Opsi tanpa hasil (count 0) tetap tampil tapi dinonaktifkan agar mahasiswa
+  // melihat seluruh pilihan; mencegah dead-end halaman kosong.
   const shown = limit ? items.slice(0, limit) : items;
 
   return (
     <div>
       <p className="mb-2 text-sm font-medium text-gray-900">{title}</p>
       <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
-        {shown.map((item) => (
-          <label key={item.value} className="flex cursor-pointer items-center gap-2 rounded-lg py-1 text-sm text-gray-700 hover:bg-gray-50">
-            <input
-              type="checkbox"
-              name={name}
-              value={item.value}
-              defaultChecked={checked.includes(item.value)}
-              className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-            />
-            <span className="min-w-0 truncate">{item.label}</span>
-            <span className="ml-auto shrink-0 text-xs text-gray-400">{item.count.toLocaleString('id-ID')}</span>
-          </label>
-        ))}
+        {shown.map((item) => {
+          const disabled = item.count === 0 && !checked.includes(item.value);
+          return (
+            <label
+              key={item.value}
+              className={`flex items-center gap-2 rounded-lg py-1 text-sm ${
+                disabled ? 'cursor-not-allowed text-gray-300' : 'cursor-pointer text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <input
+                type="checkbox"
+                name={name}
+                value={item.value}
+                defaultChecked={checked.includes(item.value)}
+                disabled={disabled}
+                className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 disabled:opacity-40"
+              />
+              <span className="min-w-0 truncate">{item.label}</span>
+              <span className={`ml-auto shrink-0 text-xs ${disabled ? 'text-gray-300' : 'text-gray-400'}`}>
+                {item.count.toLocaleString('id-ID')}
+              </span>
+            </label>
+          );
+        })}
       </div>
     </div>
   );
