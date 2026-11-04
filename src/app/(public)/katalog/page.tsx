@@ -67,6 +67,21 @@ export default async function CatalogPage({
 
       <ActiveFilterChips query={query} facets={facets} />
 
+      {/* Pemberitahuan mode pencarian fallback */}
+      {result.mode === 'or' && (
+        <p className="mt-2 text-xs text-gray-500">
+          Tidak ada hasil yang cocok dengan semua kata — menampilkan hasil yang mengandung{' '}
+          <span className="font-semibold text-gray-700">salah satu</span> kata kunci.
+        </p>
+      )}
+      {result.mode === 'typo' && result.corrected && (
+        <p className="mt-2 text-xs text-gray-500">
+          Menampilkan hasil untuk{' '}
+          <span className="font-semibold text-primary-600">&ldquo;{result.corrected}&rdquo;</span> —
+          hasil untuk &ldquo;{query.q}&rdquo; tidak ditemukan.
+        </p>
+      )}
+
       {/* Chip subjek cepat */}
       <div className="mt-3">
         <SubjectChips query={query} subjects={facets.subjects} />

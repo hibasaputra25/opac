@@ -22,6 +22,8 @@ export type BookListItem = {
 
 export type SearchParams = {
   q?: string;
+  /** Mode pencarian kata kunci: 'and' (ketat) atau 'or' (longgar/fallback). */
+  qMode?: 'and' | 'or';
   subject?: string;
   category?: string;
   language?: string;
@@ -82,12 +84,29 @@ export function ftsQuery(q: string): string | null {
   return tokens.map((t) => `"${t}"*`).join(' AND ');
 }
 
+/** Versi OR dari ftsQuery — untuk fallback hasil longgar. */
+export function ftsQueryOr(q: string): string | null {
+  const tokens = q
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .split(/\s+/)
+    .filter((t) => t.length > 1)
+    .slice(0, 8);
+  if (!tokens.length) return null;
+  return tokens.map((t) => `"${t}"*`).join(' OR ');
+}
+
+/**
+ * Bobot relevansi bm25 per kolom FTS: judul 5x, pengarang 3x, subjek 2x,
+ * sisanya 1x. Angka negatif (skor bm25 lebih kecil = lebih relevan).
+ */
+const BM25_WEIGHTS = 'bm25(books_fts, 5.0, 3.0, 2.0, 1.0, 1.0, 1.0)';
+
 function buildWhere(params: SearchParams, exclude?: keyof SearchParams) {
   const clauses: string[] = [];
   const args: unknown[] = [];
 
   if (params.q) {
-    const match = ftsQuery(params.q);
+    const match = params.qMode === 'or' ? ftsQueryOr(params.q) : ftsQuery(params.q);
     if (match) {
       clauses.push('b.id IN (SELECT rowid FROM books_fts WHERE books_fts MATCH ?)');
       args.push(match);
@@ -177,30 +196,183 @@ function orderBy(params: SearchParams) {
       return `ORDER BY ${HAS_COVER}, b.id DESC`;
     default:
       if (params.q && ftsQuery(params.q)) {
-        // Pencarian kata kunci: utamakan relevansi, sampul hanya jadi pemecah seri.
-        return `ORDER BY (SELECT rank FROM books_fts WHERE rowid = b.id) ASC, ${HAS_COVER}, b.title ASC`;
+        // Pencarian kata kunci: relevansi dihitung SEKALI di derived table FTS
+        // (bukan subquery per baris — bm25 di 8 ribu baris butuh ~10 detik,
+        // lewat derived table hanya ~30 ms). Hasilnya digabung balik ke books.
+        const match = (params.qMode === 'or' ? ftsQueryOr(params.q) : ftsQuery(params.q)) ?? '';
+        const literal = match.replace(/'/g, "''");
+        return `ORDER BY (SELECT score FROM (
+            SELECT rowid AS fts_rowid, ${BM25_WEIGHTS} AS score
+              FROM books_fts WHERE books_fts MATCH '${literal}'
+          ) WHERE fts_rowid = b.id) ASC, ${HAS_COVER}, b.title ASC`;
       }
       return `ORDER BY ${HAS_COVER}, b.id DESC`;
   }
 }
 
-export function searchBooks(params: SearchParams) {
+/**
+ * Skor relevansi sekali di CTE (materialized), lalu JOIN — bukan subquery per
+ * baris. bm25 per baris di 8 ribu hasil butuh ~12 detik; lewat CTE ~36 ms.
+ * Mengembalikan null bila pencarian bukan mode kata kunci.
+ */
+function relevanceCte(params: SearchParams): { cte: string; order: string } | null {
+  if (!params.q) return null;
+  const match = (params.qMode === 'or' ? ftsQueryOr(params.q) : ftsQuery(params.q)) ?? null;
+  if (!match) return null;
+  const literal = match.replace(/'/g, "''");
+  return {
+    cte: `WITH scored AS MATERIALIZED (
+  SELECT rowid AS fts_rowid, ${BM25_WEIGHTS} AS score
+    FROM books_fts WHERE books_fts MATCH '${literal}'
+)`,
+    order: `ORDER BY rel.score ASC, ${HAS_COVER}, b.title ASC`,
+  };
+}
+
+/**
+ * Cari koreksi untuk kata yang tidak ditemukan di indeks.
+ *
+ * Kandidat diambil dari judul memakai awalan pendek token (4 huruf). Awalan
+ * sengaja pendek karena kata yang salah ketik justru bisa menemukan dirinya
+ * sendiri bila LIKE memakai token penuh — dan kandidat salah itu bisa
+ * menghabiskan jendela LIMIT sebelum kata yang benar ditemukan.
+ */
+function bestTypoFix(token: string): string | null {
+  if (token.length < 5) return null;
+  const prefix = token.slice(0, 4);
+  const candidates = all<{ word: string }>(
+    `SELECT lower(title) AS word FROM books WHERE title LIKE ? LIMIT 1200`,
+    [`%${prefix}%`],
+  ).flatMap((row) => row.word.split(/\s+/));
+
+  const unique = [...new Set(candidates)].filter(
+    (w) =>
+      w !== token.toLowerCase() &&
+      w.length >= 4 &&
+      w.length <= token.length + 2 &&
+      /^[a-z]+$/.test(w),
+  );
+  if (!unique.length) return null;
+
+  const distance = (a: string, b: string) => {
+    const m = a.length;
+    const n = b.length;
+    const dp = Array.from({ length: m + 1 }, (_, i) => [i, ...Array<number>(n).fill(0)]);
+    for (let j = 0; j <= n; j += 1) dp[0][j] = j;
+    for (let i = 1; i <= m; i += 1) {
+      for (let j = 1; j <= n; j += 1) {
+        dp[i][j] = Math.min(
+          dp[i - 1][j] + 1,
+          dp[i][j - 1] + 1,
+          dp[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1),
+        );
+      }
+    }
+    return dp[m][n];
+  };
+
+  let best: { word: string; dist: number } | null = null;
+  for (const word of unique) {
+    const dist = distance(token.toLowerCase(), word);
+    const allowed = token.length >= 7 ? 2 : 1;
+    if (dist <= allowed && (!best || dist < best.dist)) {
+      best = { word, dist };
+    }
+  }
+  return best?.word ?? null;
+}
+
+/** Token kata kunci — dipakai oleh koreksi typo di searchBooks. */
+function tokenize(q: string): string[] {
+  return q
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .split(/\s+/)
+    .filter((t) => t.length > 1)
+    .slice(0, 8);
+}
+
+export type SearchResult = {
+  rows: BookListItem[];
+  total: number;
+  page: number;
+  perPage: number;
+  pages: number;
+  /** Mode yang benar-benar dipakai setelah fallback: 'and' | 'or' | 'typo'. */
+  mode: 'and' | 'or' | 'typo';
+  /** Kata kunci yang dikoreksi saat mode 'typo'. */
+  corrected?: string;
+};
+
+/**
+ * Pencarian koleksi dengan fallback bertingkat:
+ *
+ * 1. AND ketat (semua kata harus muncul) + urutan relevansi berbobot.
+ * 2. Bila hasil < 3: OR longgar (salah satu kata), diurutkan dengan bobot.
+ * 3. Bila OR juga gagal: perbaiki satu kata yang dicurigai typo dan ulangi AND.
+ */
+export function searchBooks(params: SearchParams): SearchResult {
   const page = Math.max(1, params.page ?? 1);
   const perPage = Math.min(60, Math.max(6, params.perPage ?? 20));
   const offset = (page - 1) * perPage;
-  const where = buildWhere(params);
 
-  const total =
-    one<{ n: number }>(
-      `SELECT count(*) AS n FROM books b
-       LEFT JOIN categories c ON c.id = b.category_id ${where.sql}`,
-      where.args,
-    )?.n ?? 0;
+  const attempt = (attemptParams: SearchParams) => {
+    const where = buildWhere(attemptParams);
+    const rel = relevanceCte(attemptParams);
+    const cte = rel?.cte ?? '';
+    const total =
+      one<{ n: number }>(
+        `${cte} SELECT count(*) AS n FROM ${rel ? 'scored rel JOIN books b ON b.id = rel.fts_rowid' : 'books b'}
+         LEFT JOIN categories c ON c.id = b.category_id ${where.sql}`,
+        where.args,
+      )?.n ?? 0;
+    return { where, total, cte, rel };
+  };
 
+  let q = params.q?.trim() || undefined;
+  let mode: SearchResult['mode'] = 'and';
+  let corrected: string | undefined;
+
+  // Tingkat 1: AND ketat.
+  let attempt1 = attempt({ ...params, q, qMode: 'and' });
+  let total = attempt1.total;
+
+  // Tingkat 2: OR longgar bila hasil terlalu sedikit.
+  if (q && total < 3) {
+    const or = attempt({ ...params, q, qMode: 'or' });
+    if (or.total > total) {
+      attempt1 = or;
+      total = or.total;
+      mode = 'or';
+    }
+  }
+
+  // Tingkat 3: koreksi typo. Dijalankan bila hasil AND jauh lebih sedikit
+  // dari yang seharusnya (ambang 20) — "manajamen" (11) korek ke "manajemen"
+  // (8.403). Koreksi dipakai hanya bila hasilnya lebih banyak.
+  if (q && total < 20) {
+    for (const token of tokenize(q)) {
+      const fix = bestTypoFix(token);
+      if (fix && fix.toLowerCase() !== token.toLowerCase()) {
+        const fixed = q.replace(new RegExp(token, 'i'), fix);
+        const retry = attempt({ ...params, q: fixed, qMode: 'and' });
+        if (retry.total > total) {
+          q = fixed;
+          corrected = fix;
+          attempt1 = retry;
+          total = retry.total;
+          mode = 'typo';
+          break;
+        }
+      }
+    }
+  }
+
+  const { where, cte, rel } = attempt1;
+  const from = rel ? 'scored rel JOIN books b ON b.id = rel.fts_rowid' : 'books b';
   const ids = all<{ id: number }>(
-    `SELECT b.id FROM books b
+    `${cte} SELECT b.id FROM ${from}
      LEFT JOIN categories c ON c.id = b.category_id
-     ${where.sql} ${orderBy(params)} LIMIT ? OFFSET ?`,
+     ${where.sql} ${rel ? rel.order : orderBy({ ...params, q })} LIMIT ? OFFSET ?`,
     [...where.args, perPage, offset],
   ).map((row) => row.id);
 
@@ -210,10 +382,10 @@ export function searchBooks(params: SearchParams) {
     page,
     perPage,
     pages: Math.max(1, Math.ceil(total / perPage)),
+    mode,
+    corrected,
   };
-}
-
-export type Facet = { label: string; value: string; count: number };
+}export type Facet = { label: string; value: string; count: number };
 
 export function getFacets(params: SearchParams) {
   const subjectsWhere = buildWhere(params, 'subject');
