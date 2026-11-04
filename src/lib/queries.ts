@@ -232,27 +232,30 @@ function relevanceCte(params: SearchParams): { cte: string; order: string } | nu
 /**
  * Cari koreksi untuk kata yang tidak ditemukan di indeks.
  *
- * Kandidat diambil dari judul memakai awalan pendek token (4 huruf). Awalan
- * sengaja pendek karena kata yang salah ketik justru bisa menemukan dirinya
- * sendiri bila LIKE memakai token penuh — dan kandidat salah itu bisa
- * menghabiskan jendela LIMIT sebelum kata yang benar ditemukan.
+ * Kandidat dicari lewat trigram (tabel `vocabulary_trigram`, dibangun skrip
+ * rebuild-search): kesalahan sisipan/hapus di tengah kata memecah prefix
+ * ("eknomi" tidak berbagi prefix-3 dengan "ekonomi") tetapi hanya merusak
+ * beberapa trigram, sehingga kandidat tetap ditemukan. Kandidat terbaik
+ * dipilih dengan jarak edit (<= 2, kata >= 7 huruf boleh 2).
  */
 function bestTypoFix(token: string): string | null {
-  if (token.length < 5) return null;
-  const prefix = token.slice(0, 4);
-  const candidates = all<{ word: string }>(
-    `SELECT lower(title) AS word FROM books WHERE title LIKE ? LIMIT 1200`,
-    [`%${prefix}%`],
-  ).flatMap((row) => row.word.split(/\s+/));
+  const lower = token.toLowerCase();
+  if (lower.length < 5 || !/^[a-z]+$/.test(lower)) return null;
 
-  const unique = [...new Set(candidates)].filter(
-    (w) =>
-      w !== token.toLowerCase() &&
-      w.length >= 4 &&
-      w.length <= token.length + 2 &&
-      /^[a-z]+$/.test(w),
+  const padded = `  ${lower}  `;
+  const trigrams = new Set<string>();
+  for (let i = 0; i <= padded.length - 3; i += 1) trigrams.add(padded.slice(i, i + 3));
+  if (!trigrams.size) return null;
+
+  const placeholders = [...trigrams].map(() => '?').join(',');
+  const candidates = all<{ word: string; shared: number }>(
+    `SELECT word, count(*) AS shared FROM vocabulary_trigram
+      WHERE trig IN (${placeholders})
+      GROUP BY word ORDER BY shared DESC LIMIT 60`,
+    [...trigrams],
   );
-  if (!unique.length) return null;
+
+  if (!candidates.length) return null;
 
   const distance = (a: string, b: string) => {
     const m = a.length;
@@ -271,15 +274,33 @@ function bestTypoFix(token: string): string | null {
     return dp[m][n];
   };
 
-  let best: { word: string; dist: number } | null = null;
-  for (const word of unique) {
-    const dist = distance(token.toLowerCase(), word);
-    const allowed = token.length >= 7 ? 2 : 1;
-    if (dist <= allowed && (!best || dist < best.dist)) {
-      best = { word, dist };
+  // Evaluasi semua kandidat dalam jarak terizinkan, lalu pilih dengan skor
+  // gabungan: jarak edit + penalti kelangkaan. Tanpa penalti, typo yang
+  // terlanjur masuk kosakata (ada 2 judul dengan "keuanagan") menang dari
+  // kata yang benar ("keuangan", 1.186 buku) hanya karena selisih jarak 1.
+  const fixes: { word: string; dist: number; count: number }[] = [];
+  for (const { word } of candidates) {
+    if (word === lower) continue;
+    const dist = distance(lower, word);
+    const allowed = lower.length >= 7 ? 2 : 1;
+    if (dist <= allowed) {
+      const count =
+        one<{ n: number }>('SELECT count(*) AS n FROM books_fts WHERE books_fts MATCH ?', [
+          `"${word}"*`,
+        ])?.n ?? 0;
+      fixes.push({ word, dist, count });
     }
   }
-  return best?.word ?? null;
+  if (!fixes.length) return null;
+
+  // Penalti kelangkaan: kata yang dipakai < 20 buku dianggap langka
+  // (kemungkinan typo itu sendiri yang terlanjur masuk judul).
+  const RARE = 20;
+  const score = (f: { dist: number; count: number }) =>
+    f.dist + (f.count < RARE ? 1.5 : 0);
+
+  fixes.sort((a, b) => score(a) - score(b));
+  return fixes[0].word;
 }
 
 /** Token kata kunci — dipakai oleh koreksi typo di searchBooks. */

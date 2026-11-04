@@ -40,6 +40,22 @@ CREATE TABLE IF NOT EXISTS categories (
   slug      TEXT NOT NULL UNIQUE
 );
 
+-- ---------- Kosakata untuk koreksi typo pencarian ----------
+-- Diisi ulang oleh scripts/rebuild-search.mjs setiap impor data.
+CREATE TABLE IF NOT EXISTS vocabulary (
+  word TEXT PRIMARY KEY,
+  len  INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_vocab_prefix ON vocabulary(word, len);
+
+-- Indeks trigram: kandidat typo yang tahan terhadap kesalahan di tengah kata
+-- (kesalahan sisipan/hapus memecah prefix, tapi hanya merusak <= 3 trigram).
+CREATE TABLE IF NOT EXISTS vocabulary_trigram (
+  word TEXT NOT NULL,
+  trig TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_trig ON vocabulary_trigram(trig);
+
 -- ---------- Koleksi ----------
 
 CREATE TABLE IF NOT EXISTS books (
