@@ -14,13 +14,15 @@ type Facets = {
  * Daftar chip subjek di atas grid (pola Jaklitera): tautan cepat satu klik,
  * digeser horizontal bila melebihi lebar layar.
  *
- * Terdiri dari dua kelompok, berdampingan dalam satu baris scroll:
- * 1. Subjek terpilih yang di luar 7 besar — "disuntik" paling kiri, menyala,
- *    klik lagi untuk melepas lalu chip-nya lenyap (kembali ke 7 default).
- * 2. 7 subjek terpopuler — menyala bila subjeknya terpilih.
- *
- * Pilihan lengkap tetap tersedia di modal Filter.
+ * Kapasitas baris maksimal 7 chip, terisi dengan prioritas:
+ * 1. Subjek terpilih di luar 7 besar — disuntik paling kiri, menyala, klik
+ *    lagi untuk melepas lalu chip-nya lenyap.
+ * 2. Subjek populer — slot tersisa diisi mengikuti urutan popularitas;
+ *    default yang terpilih selalu ikut (menyala) dan tidak pernah
+ *    disembunyikan, agar pengguna bisa melepasnya tanpa buka modal.
  */
+const MAX_CHIPS = 7;
+
 export function SubjectChips({ query, subjects }: { query: CatalogQuery; subjects: Facet[] }) {
   const active = parseMulti(query.subject);
   const defaults = subjects.slice(0, 7);
@@ -35,14 +37,27 @@ export function SubjectChips({ query, subjects }: { query: CatalogQuery; subject
       isActive: true,
     }));
 
-  const chips = [
-    ...injected,
-    ...defaults.map((subject) => ({
+  // Slot sisa untuk chip default; yang terpilih selalu ikut (tidak pernah
+  // disembunyikan, agar pengguna bisa melepasnya tanpa buka modal).
+  const chosenDefaults = defaults.filter((s) => active.includes(s.value));
+  const remaining = Math.max(0, MAX_CHIPS - injected.length - chosenDefaults.length);
+  const defaultChips = [
+    ...chosenDefaults.map((subject) => ({
       value: subject.value,
       label: subject.label,
-      isActive: active.includes(subject.value),
+      isActive: true,
     })),
+    ...defaults
+      .filter((s) => !active.includes(s.value))
+      .slice(0, remaining)
+      .map((subject) => ({
+        value: subject.value,
+        label: subject.label,
+        isActive: false,
+      })),
   ];
+
+  const chips = [...injected, ...defaultChips];
 
   if (!chips.length) return null;
 
