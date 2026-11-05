@@ -4,6 +4,7 @@ import { BookList } from '@/components/ui/book-list';
 import { FilterModal } from '@/components/ui/filter-modal';
 import { Pagination } from '@/components/ui/pagination';
 import { SubjectChips, ActiveFilterChips } from '@/components/ui/subject-chips';
+import { SearchAutofocus } from '@/components/ui/search-autofocus';
 import { getFacets, searchBooks } from '@/lib/queries';
 import { trackSearch } from '@/lib/recommendations';
 import {
@@ -33,6 +34,7 @@ export default async function CatalogPage({
   return (
     <div className="min-h-screen">
       {/* Baris 1: pencarian (kiri, lebar) + tombol filter (kanan) */}
+      <SearchAutofocus inputId="search-books" />
       <form action="/katalog" method="GET" className="flex items-center gap-2">
         <label htmlFor="search-books" className="sr-only">
           Cari koleksi

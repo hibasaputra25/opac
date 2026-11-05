@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { SearchAutofocus } from './search-autofocus';
 
 /** Kartu info ringkas dengan garis aksen kiri — bukan blok warna penuh. */
 function InfoCard({
@@ -42,6 +43,7 @@ function InfoCard({
 export function RightSidebar() {
   return (
     <aside className="scroll-container fixed right-0 top-0 z-10 hidden h-screen w-1/6 flex-col gap-3 overflow-y-auto border-l border-gray-200 bg-white p-4 lg:flex">
+      <SearchAutofocus inputId="sidebar-search" exceptPaths={['/katalog']} />
       <form action="/katalog" className="w-full">
         <label htmlFor="sidebar-search" className="sr-only">
           Cari koleksi

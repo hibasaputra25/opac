@@ -122,6 +122,7 @@ export function MobileHeader() {
               name="q"
               type="search"
               placeholder="Cari judul, pengarang, ISBN"
+              autoFocus
               className="block w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm"
             />
           </form>
