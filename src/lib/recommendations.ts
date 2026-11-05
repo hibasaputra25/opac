@@ -57,8 +57,18 @@ export async function trackBookView(bookId: number) {
            SELECT id FROM book_views WHERE user_ref = ? ORDER BY viewed_at DESC, id DESC LIMIT 50)`,
       )
       .run(ref, ref);
+    // Riwayat berubah → rekomendasi yang tersimpan untuk pengunjung ini sudah
+    // usang. Tanpa ini beranda masih menampilkan hasil lama sampai TTL habis.
+    invalidateRecommendations(ref);
   } catch {
     // Tracking tidak boleh mematahkan halaman detail.
+  }
+}
+
+/** Buang cache rekomendasi milik satu pengunjung (semua limit). */
+function invalidateRecommendations(ref: string) {
+  for (const key of recommendationCache.keys()) {
+    if (key.startsWith(`${ref}:`)) recommendationCache.delete(key);
   }
 }
 
@@ -72,6 +82,7 @@ export async function trackSearch(keyword: string, resultCount: number) {
       keyword.slice(0, 200),
       resultCount,
     ]);
+    invalidateRecommendations(ref);
   } catch {
     // idem
   }
@@ -108,61 +119,89 @@ const recommendationCache = new Map<string, { at: number; value: Recommendation 
 
 function computeRecommendations(userRef: string | null, limit: number): Recommendation {
   if (userRef) {
-    // Sinyal 1: buku yang dilihat (terbaru dulu).
+    // Bobot sinyal: minat terbaru harus mendominasi. Buku yang baru dilihat
+    // diberi bobot tertinggi dan menurun untuk yang lebih lama, sehingga
+    // beranda bergeser mengikuti subjek yang terakhir dicari/dibuka.
+    const weights = new Map<number, number>();
+    const add = (id: number, weight: number) => {
+      weights.set(id, Math.max(weights.get(id) ?? 0, weight));
+    };
+
+    // Sinyal 1: buku yang dilihat (terbaru dulu) — bobot 1.0 turun 0.07/posisi.
     const viewed = all<{ book_id: number }>(
       `SELECT DISTINCT book_id FROM book_views WHERE user_ref = ?
        ORDER BY viewed_at DESC, id DESC LIMIT ?`,
       [userRef, MAX_RECENT_VIEWS],
     ).map((r) => r.book_id);
+    viewed.forEach((id, index) => add(id, Math.max(0.3, 1 - index * 0.07)));
 
-    // Sinyal 2: favorit.
-    let favoriteIds: number[] = [];
+    // Sinyal 2: favorit — indikasi minat yang kuat.
     if (userRef.startsWith('u:')) {
-      favoriteIds = all<{ book_id: number }>(
+      all<{ book_id: number }>(
         `SELECT w.book_id FROM wishlists w JOIN users u ON u.id = w.user_id
           WHERE u.id = ? ORDER BY w.id DESC LIMIT ?`,
         [Number(userRef.slice(2)), MAX_RECENT_VIEWS],
-      ).map((r) => r.book_id);
+      ).forEach((r) => add(r.book_id, 0.8));
     }
 
-    // Sinyal 3: riwayat pinjam (via member_no di circulation_history).
-    let loanedIds: number[] = [];
+    // Sinyal 3: riwayat pinjam (dicocokkan lewat judul — data lama tanpa id).
     if (userRef.startsWith('u:')) {
       const memberNo = one<{ member_no: string }>(
         'SELECT member_no FROM users WHERE id = ?',
         [Number(userRef.slice(2))],
       )?.member_no;
       if (memberNo) {
-        // Judul dipinjam dicocokkan ke books lewat title (data riwayat lama
-        // tidak menyimpan book_id).
-        loanedIds = all<{ id: number }>(
+        all<{ id: number }>(
           `SELECT DISTINCT b.id FROM books b
              JOIN circulation_history c ON c.title = b.title
             WHERE c.member_no = ? LIMIT ?`,
           [memberNo, MAX_RECENT_VIEWS],
-        ).map((r) => r.id);
+        ).forEach((r) => add(r.id, 0.7));
       }
     }
 
-    const signalIds = [...new Set([...viewed, ...favoriteIds, ...loanedIds])];
-    const excluded = new Set(signalIds);
-
-    if (signalIds.length) {
-      const placeholders = signalIds.map(() => '?').join(',');
-      const rows = all<{ id: number; shared: number }>(
-        `SELECT bs.book_id AS id, count(*) AS shared
+    // Sinyal 4: kata kunci pencarian terakhir — subjek yang namanya memuat
+    // kata tersebut dianggap minat baru, bobot kecil (pencarian belum tentu
+    // berarti minat).
+    const searches = all<{ keyword: string }>(
+      `SELECT keyword FROM search_logs WHERE user_ref = ? ORDER BY id DESC LIMIT 3`,
+      [userRef],
+    );
+    for (const { keyword } of searches) {
+      const clean = keyword.trim();
+      if (clean.length < 3) continue;
+      all<{ id: number }>(
+        `SELECT bs.book_id AS id
            FROM book_subjects bs
-           JOIN book_subjects bs2 ON bs2.subject_id = bs.subject_id
-          WHERE bs2.book_id IN (${placeholders}) AND bs.book_id NOT IN (${placeholders})
+           JOIN subjects s ON s.id = bs.subject_id
+          WHERE s.name LIKE ? OR s.slug LIKE ?
+          LIMIT 40`,
+        [`%${clean}%`, `%${clean.toLowerCase().replace(/\s+/g, '-')}%`],
+      ).forEach((r) => add(r.id, 0.45));
+    }
+
+    if (weights.size) {
+      const entries = [...weights.entries()];
+      const valuesSql = entries.map(() => '(?, ?)').join(',');
+      const valuesArgs = entries.flatMap(([id, w]) => [id, w]);
+      const idsSql = entries.map(() => '?').join(',');
+
+      // Skor kandidat = jumlah bobot buku sinyal yang berbagi subjek.
+      const rows = all<{ id: number; score: number }>(
+        `WITH signals(book_id, weight) AS (VALUES ${valuesSql})
+         SELECT bs.book_id AS id, sum(sig.weight) AS score
+           FROM signals sig
+           JOIN book_subjects bs2 ON bs2.book_id = sig.book_id
+           JOIN book_subjects bs ON bs.subject_id = bs2.subject_id
+          WHERE bs.book_id NOT IN (${idsSql})
           GROUP BY bs.book_id
-          ORDER BY shared DESC, bs.book_id DESC
+          ORDER BY score DESC, bs.book_id DESC
           LIMIT ?`,
-        [...signalIds, ...signalIds, limit],
+        [...valuesArgs, ...entries.map(([id]) => id), limit],
       ).map((r) => r.id);
 
-      const filtered = rows.filter((id) => !excluded.has(id)).slice(0, limit);
-      if (filtered.length) {
-        return { books: hydrateBooks(filtered), personalized: true };
+      if (rows.length) {
+        return { books: hydrateBooks(rows), personalized: true };
       }
     }
   }
