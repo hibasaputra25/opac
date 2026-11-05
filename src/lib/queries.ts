@@ -427,20 +427,53 @@ function withStaticOptions(results: Facet[], masters: { label: string; value: st
   ];
 }
 
-export function getFacets(params: SearchParams) {
-  // Daftar opsi statis dari master data — tidak dipengaruhi filter apa pun.
-  const masterSubjects = all<{ label: string; value: string }>(
-    `SELECT s.name AS label, s.slug AS value FROM subjects s ORDER BY s.name ASC`,
-  );
-  const masterCategories = all<{ label: string; value: string }>(
-    `SELECT c.name AS label, c.slug AS value FROM categories c ORDER BY c.name ASC`,
-  );
-  const masterLanguages = all<{ label: string; value: string }>(
-    `SELECT DISTINCT b.language AS label, b.language AS value FROM books b WHERE b.language IS NOT NULL ORDER BY b.language`,
-  );
-  const masterLocations = all<{ label: string; value: string }>(
-    `SELECT l.name AS label, l.code AS value FROM locations l WHERE l.is_active = 1 ORDER BY l.name`,
-  );
+/**
+ * Cache daftar opsi master (subjek/kategori/bahasa/lokasi). Isinya hanya
+ * berubah saat data diimpor ulang, jadi cukup dihitung sekali per proses.
+ * Menghemat ~57 ms per permintaan katalog.
+ */
+let masterCache: {
+  subjects: { label: string; value: string }[];
+  categories: { label: string; value: string }[];
+  languages: { label: string; value: string }[];
+  locations: { label: string; value: string }[];
+} | null = null;
+
+function getMasters() {
+  if (masterCache) return masterCache;
+  masterCache = {
+    subjects: all<{ label: string; value: string }>(
+      `SELECT s.name AS label, s.slug AS value FROM subjects s ORDER BY s.name ASC`,
+    ),
+    categories: all<{ label: string; value: string }>(
+      `SELECT c.name AS label, c.slug AS value FROM categories c ORDER BY c.name ASC`,
+    ),
+    languages: all<{ label: string; value: string }>(
+      `SELECT DISTINCT b.language AS label, b.language AS value FROM books b WHERE b.language IS NOT NULL ORDER BY b.language`,
+    ),
+    locations: all<{ label: string; value: string }>(
+      `SELECT l.name AS label, l.code AS value FROM locations l WHERE l.is_active = 1 ORDER BY l.name`,
+    ),
+  };
+  return masterCache;
+}
+
+/**
+ * Cache facet hasil pencarian. Agregat subjek (11.715 grup) makan ~103 ms dan
+ * nilainya hanya berubah bila filter berubah, jadi disimpan singkat (30 detik)
+ * per kombinasi parameter. Data katalog berubah lewat skrip impor, bukan lewat
+ * UI, sehingga jeda 30 detik tidak terasa.
+ */
+const FACET_TTL_MS = 30_000;
+const FACET_CACHE_MAX = 60;
+const facetCache = new Map<string, { at: number; value: ReturnType<typeof computeFacets> }>();
+
+/** Cache subjek terpopuler (beranda) — agregat mahal, data statis. */
+const topSubjectsCache = new Map<number, { at: number; value: { label: string; value: string; count: number }[] }>();
+
+function computeFacets(params: SearchParams) {
+  const { subjects: masterSubjects, categories: masterCategories, languages: masterLanguages, locations: masterLocations } =
+    getMasters();
 
   const subjectsWhere = buildWhere(params, 'subject');
   const subjects = all<Facet>(
@@ -510,6 +543,35 @@ export function getFacets(params: SearchParams) {
     languages: plain(withStaticOptions(languages, masterLanguages)),
     locations: plain(withStaticOptions(locations, masterLocations)),
   };
+}
+
+export function getFacets(params: SearchParams) {
+  // Kunci cache hanya dari parameter yang memengaruhi hitungan — urutan tampilan
+  // (sort/page) dan mode tampilan tidak relevan.
+  const key = JSON.stringify([
+    params.q ?? '',
+    params.qMode ?? 'and',
+    params.subject ?? '',
+    params.category ?? '',
+    params.language ?? '',
+    params.location ?? '',
+    params.available ?? false,
+    params.yearFrom ?? 0,
+    params.yearTo ?? 0,
+  ]);
+
+  const hit = facetCache.get(key);
+  const now = Date.now();
+  if (hit && now - hit.at < FACET_TTL_MS) return hit.value;
+
+  const value = computeFacets(params);
+  if (facetCache.size >= FACET_CACHE_MAX) {
+    // Buang entri tertua (Map menjaga urutan sisip).
+    const oldest = facetCache.keys().next().value;
+    if (oldest !== undefined) facetCache.delete(oldest);
+  }
+  facetCache.set(key, { at: now, value });
+  return value;
 }
 
 export function getBook(id: number) {
@@ -609,12 +671,19 @@ export function getStats() {
 }
 
 export function getTopSubjects(limit = 8) {
-  return all<{ label: string; value: string; count: number }>(
+  // Agregat seluruh book_subjects (~60 ms); isinya hanya berubah saat impor.
+  const key = limit;
+  const hit = topSubjectsCache.get(key);
+  if (hit && Date.now() - hit.at < 5 * 60_000) return hit.value;
+
+  const value = all<{ label: string; value: string; count: number }>(
     `SELECT s.name AS label, s.slug AS value, count(*) AS count
        FROM subjects s JOIN book_subjects bs ON bs.subject_id = s.id
       GROUP BY s.id ORDER BY count DESC LIMIT ?`,
     [limit],
   );
+  topSubjectsCache.set(key, { at: Date.now(), value });
+  return value;
 }
 
 export function getLocations() {

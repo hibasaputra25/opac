@@ -38,9 +38,13 @@ const NOTES = [
   {
     text: 'Semua User dan Password dimohon tidak dipublish di internet atau media terbuka (facebook, X, website, blog, atau sejenisnya).',
   },
-  {
-    text: 'Cp.: 0823-1123-2229 (Meruya), 0852-1954-2943 (Menteng), 0821-359-359-55 (Warung Buncit).',
-  },
+];
+
+/** Kontak layanan — tap nomor langsung membuka WhatsApp. */
+const CONTACTS = [
+  { label: '0823-1123-2229', campus: 'Meruya', wa: '6282311232229' },
+  { label: '0852-1954-2943', campus: 'Menteng', wa: '6285219542943' },
+  { label: '0821-359-359-55', campus: 'Warung Buncit', wa: '6282135935955' },
 ];
 
 export default function EbooksPage() {
@@ -118,6 +122,29 @@ export default function EbooksPage() {
               </span>
             </li>
           ))}
+
+          {/* Kontak layanan — nomor langsung membuka WhatsApp */}
+          <li className="flex gap-2">
+            <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-gray-400" />
+            <span>
+              Cp.:{' '}
+              {CONTACTS.map((contact, index) => (
+                <span key={contact.wa}>
+                  {index > 0 && ', '}
+                  <a
+                    href={`https://wa.me/${contact.wa}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-semibold text-primary-600 hover:underline"
+                    title={`WhatsApp ${contact.campus}`}
+                  >
+                    {contact.label}
+                  </a>{' '}
+                  <span className="text-gray-500">({contact.campus})</span>
+                </span>
+              ))}
+            </span>
+          </li>
         </ul>
       </div>
     </div>

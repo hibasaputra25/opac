@@ -88,6 +88,25 @@ type Recommendation = {
  * berbagi subjek terbanyak. Tanpa riwayat → fallback koleksi terbaru.
  */
 export function getRecommendations(userRef: string | null, limit = 8): Recommendation {
+  // Hasil per pengunjung di-cache singkat: menghindari agregat subjek (~72 ms)
+  // pada setiap refresh, tetapi tetap diperbarui setelah pengguna menjelajah.
+  const cacheKey = `${userRef ?? 'anon'}:${limit}`;
+  const hit = recommendationCache.get(cacheKey);
+  if (hit && Date.now() - hit.at < RECOMMENDATION_TTL_MS) return hit.value;
+
+  const value = computeRecommendations(userRef, limit);
+  if (recommendationCache.size >= 200) {
+    const oldest = recommendationCache.keys().next().value;
+    if (oldest !== undefined) recommendationCache.delete(oldest);
+  }
+  recommendationCache.set(cacheKey, { at: Date.now(), value });
+  return value;
+}
+
+const RECOMMENDATION_TTL_MS = 60_000;
+const recommendationCache = new Map<string, { at: number; value: Recommendation }>();
+
+function computeRecommendations(userRef: string | null, limit: number): Recommendation {
   if (userRef) {
     // Sinyal 1: buku yang dilihat (terbaru dulu).
     const viewed = all<{ book_id: number }>(

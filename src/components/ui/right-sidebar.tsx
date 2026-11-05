@@ -107,7 +107,7 @@ export function RightSidebar() {
             Email
           </a>
           <a
-            href="https://wa.me/6281234567890"
+            href="https://wa.me/6282311232229"
             target="_blank"
             rel="noreferrer"
             className="flex items-center gap-2 rounded-xl px-2 py-1.5 text-[0.7rem] text-gray-600 hover:bg-gray-50"
