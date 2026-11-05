@@ -3,7 +3,7 @@ import { CatalogGrid } from '@/components/ui/catalog-grid';
 import { BookList } from '@/components/ui/book-list';
 import { FilterModal } from '@/components/ui/filter-modal';
 import { Pagination } from '@/components/ui/pagination';
-import { SubjectChips } from '@/components/ui/subject-chips';
+import { SubjectChips, ActiveFilterChips } from '@/components/ui/subject-chips';
 import { getFacets, searchBooks } from '@/lib/queries';
 import {
   buildQuery,
@@ -72,6 +72,9 @@ export default async function CatalogPage({
         koleksi
       </p>
 
+      {/* Chip filter aktif — masing-masing bisa dihapus satu per satu */}
+      <ActiveFilterChips query={query} facets={facets} />
+
       {/* Pemberitahuan mode pencarian fallback */}
       {result.mode === 'or' && (
         <p className="mt-2 text-xs text-gray-500">
@@ -86,11 +89,6 @@ export default async function CatalogPage({
           hasil untuk &ldquo;{query.q}&rdquo; tidak ditemukan.
         </p>
       )}
-
-      {/* Chip subjek cepat */}
-      <div className="mt-3">
-        <SubjectChips query={query} subjects={facets.subjects} />
-      </div>
 
       {/* Hasil */}
       <div id="hasil" className="mt-4 scroll-mt-20">
