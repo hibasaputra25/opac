@@ -32,10 +32,8 @@ const PLATFORMS = [
 ];
 
 const NOTES = [
-  { text: 'Link lengkap tersedia di web Perpus laman: ' },
-  { text: 'https://bit.ly/eres-umb', link: 'https://bit.ly/eres-umb' },
-  { text: 'Panduan akses klik laman: ' },
-  { text: 'https://bit.ly/pandu-eres', link: 'https://bit.ly/pandu-eres' },
+  { text: 'Link lengkap tersedia di web Perpus laman: ', link: 'https://bit.ly/eres-umb' },
+  { text: 'Panduan akses klik laman: ', link: 'https://bit.ly/pandu-eres' },
   { text: 'Ebooks Cambridge hanya bisa diakses dari jaringan kampus.' },
   {
     text: 'Semua User dan Password dimohon tidak dipublish di internet atau media terbuka (facebook, X, website, blog, atau sejenisnya).',

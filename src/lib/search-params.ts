@@ -13,6 +13,8 @@ export type CatalogQuery = {
   page: number;
   yearFrom?: number;
   yearTo?: number;
+  /** Mode tampilan hasil: 'grid' (default) atau 'list'. */
+  view?: 'grid' | 'list';
 };
 
 /** Pecah nilai filter multi-pilih menjadi daftar bersih & unik. */
@@ -47,6 +49,7 @@ export function parseCatalogParams(raw: RawSearchParams): CatalogQuery {
     page: num('page') ?? 1,
     yearFrom: num('yearFrom'),
     yearTo: num('yearTo'),
+    view: get('view') === 'list' ? 'list' : undefined,
   };
 }
 
@@ -60,6 +63,7 @@ export function buildQuery(
   for (const [key, value] of Object.entries(merged)) {
     if (value === undefined || value === null || value === '' || value === false) continue;
     if (key === 'page' && value === 1) continue;
+    if (key === 'view' && value === 'grid') continue;
     if (key === 'available') {
       if (value) params.set('available', '1');
       continue;

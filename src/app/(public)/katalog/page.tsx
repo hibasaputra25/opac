@@ -1,10 +1,16 @@
 import Link from 'next/link';
 import { CatalogGrid } from '@/components/ui/catalog-grid';
+import { BookList } from '@/components/ui/book-list';
 import { FilterModal } from '@/components/ui/filter-modal';
 import { Pagination } from '@/components/ui/pagination';
 import { ActiveFilterChips, SubjectChips } from '@/components/ui/subject-chips';
 import { getFacets, searchBooks } from '@/lib/queries';
-import { parseCatalogParams, type RawSearchParams } from '@/lib/search-params';
+import {
+  buildQuery,
+  parseCatalogParams,
+  type CatalogQuery,
+  type RawSearchParams,
+} from '@/lib/search-params';
 
 export const dynamic = 'force-dynamic';
 
@@ -53,10 +59,11 @@ export default async function CatalogPage({
         </div>
       </form>
 
-      {/* Toolbar: filter + jumlah hasil */}
+      {/* Toolbar: filter + view toggle + jumlah hasil */}
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <FilterModal query={query} facets={facets} />
+          <ViewToggle view={query.view ?? 'grid'} query={query} />
         </div>
 
         <p className="shrink-0 text-xs text-gray-400">
@@ -91,7 +98,11 @@ export default async function CatalogPage({
       <div id="hasil" className="mt-4 scroll-mt-20">
         {result.rows.length ? (
           <>
-            <CatalogGrid books={result.rows} />
+            {query.view === 'list' ? (
+              <BookList books={result.rows} />
+            ) : (
+              <CatalogGrid books={result.rows} />
+            )}
 
             <Pagination query={query} page={result.page} pages={result.pages} />
           </>
@@ -119,6 +130,48 @@ export default async function CatalogPage({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Toggle grid/daftar — dua tombol ikon, keduanya navigasi URL (konsisten
+ * dengan arsitektur server-side katalog; hasil pencarian bisa dibagikan
+ * dengan tampilannya).
+ */
+function ViewToggle({ view, query }: { view: 'grid' | 'list'; query: CatalogQuery }) {
+  const button = (target: 'grid' | 'list', active: boolean, label: string, path: string) => (
+    <Link
+      href={buildQuery(query, { view: target === 'grid' ? undefined : target, page: 1 })}
+      aria-label={label}
+      title={label}
+      aria-pressed={active}
+      className={`relative inline-flex h-8 w-9 items-center justify-center rounded-lg border transition ${
+        active
+          ? 'border-primary-500 bg-primary-500/10 text-primary-600'
+          : 'border-gray-200 bg-gray-50 text-gray-400 hover:border-primary-300 hover:text-primary-500'
+      }`}
+    >
+      <svg viewBox="0 0 20 20" className="h-4 w-4" fill="currentColor" aria-hidden="true">
+        {path}
+      </svg>
+    </Link>
+  );
+
+  return (
+    <div className="flex items-center gap-1.5" role="group" aria-label="Mode tampilan">
+      {button(
+        'grid',
+        view === 'grid',
+        'Tampilan grid',
+        'M4 3.5h5v5H4zM11 3.5h5v5h-5zM4 11.5h5v5H4zM11 11.5h5v5h-5z',
+      )}
+      {button(
+        'list',
+        view === 'list',
+        'Tampilan daftar',
+        'M3 5h14v1.8H3zM3 9.1h14v1.8H3zM3 13.2h14v1.8H3z',
+      )}
     </div>
   );
 }
