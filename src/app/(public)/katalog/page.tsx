@@ -3,7 +3,7 @@ import { CatalogGrid } from '@/components/ui/catalog-grid';
 import { BookList } from '@/components/ui/book-list';
 import { FilterModal } from '@/components/ui/filter-modal';
 import { Pagination } from '@/components/ui/pagination';
-import { ActiveFilterChips, SubjectChips } from '@/components/ui/subject-chips';
+import { SubjectChips } from '@/components/ui/subject-chips';
 import { getFacets, searchBooks } from '@/lib/queries';
 import {
   buildQuery,
@@ -60,16 +60,17 @@ export default async function CatalogPage({
 
         <FilterModal query={query} facets={facets} />
       </form>
-      {/* Baris 2: jumlah hasil (kiri) + toggle grid/daftar (kanan) */}
+      {/* Baris 2: chip subjek (menyala bila aktif) + toggle grid/daftar */}
       <div className="mt-2.5 flex items-center justify-between gap-2">
-        <p className="shrink-0 text-xs text-gray-400">
-          <span className="font-bold text-gray-700">{result.total.toLocaleString('id-ID')}</span>{' '}
-          koleksi
-        </p>
+        <SubjectChips query={query} subjects={facets.subjects} />
         <ViewToggle view={query.view ?? 'grid'} query={query} />
       </div>
 
-      <ActiveFilterChips query={query} facets={facets} />
+      {/* Jumlah hasil, kanan-bawah */}
+      <p className="mt-1.5 text-right text-xs text-gray-400">
+        <span className="font-bold text-gray-700">{result.total.toLocaleString('id-ID')}</span>{' '}
+        koleksi
+      </p>
 
       {/* Pemberitahuan mode pencarian fallback */}
       {result.mode === 'or' && (
