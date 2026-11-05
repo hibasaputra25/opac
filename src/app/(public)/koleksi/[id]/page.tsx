@@ -60,10 +60,25 @@ export default async function BookDetailPage({ params }: { params: Promise<{ id:
     { label: 'Penerbit', value: book.publisher },
     { label: 'Tahun Terbit', value: book.year?.toString() },
     { label: 'ISBN', value: book.isbn },
+    { label: 'ISSN', value: book.issn },
     { label: 'Bahasa', value: book.language },
     { label: 'Bidang', value: book.category },
-    { label: 'Jumlah Eksemplar', value: items.length ? `${items.length} eksemplar` : null },
-  ].filter((row) => row.value);
+    { label: 'Asal Terbitan', value: book.origin },
+    { label: 'Jumlah Halaman', value: book.pages?.toString() },
+    { label: 'Ukuran Fisik', value: book.size },
+    { label: 'Jenis Koleksi', value: book.collection_type },
+    {
+      label: 'Jumlah Eksemplar',
+      value: items.length
+        ? `${items.length} eksemplar (${availableCount} tersedia)`
+        : null,
+    },
+  ].map((row) => ({
+    // Kolom tanpa data tetap tampil dengan '-' agar mahasiswa melihat struktur
+    // informasi yang sama di setiap koleksi (permintaan staf perpustakaan).
+    ...row,
+    value: row.value && row.value !== '' ? row.value : '-',
+  }));
 
   return (
     <section className="relative mb-16">
@@ -212,6 +227,12 @@ export default async function BookDetailPage({ params }: { params: Promise<{ id:
                             {item.barcode ?? '—'}
                             <span className="ml-2 text-gray-400">{item.call_number ?? ''}</span>
                           </span>
+                          {/* Letak rak hanya tercatat untuk lokasi Meruya */}
+                          {(item.shelf || item.location_code === 'MRY') && (
+                            <span className="rounded bg-gray-100 px-2 py-0.5 text-gray-600">
+                              Rak: {item.shelf ?? '-'}
+                            </span>
+                          )}
                           <span className={`rounded px-2 py-0.5 font-medium ring-1 ${statusToneClass(status.tone)}`}>
                             {status.label}
                           </span>

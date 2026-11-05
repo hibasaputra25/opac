@@ -61,6 +61,7 @@ const BOTTOM = [
 const MENU = [
   ['/', 'Beranda'],
   ['/katalog', 'Daftar Koleksi'],
+  ['/ebooks', 'E-Books'],
   ['/akun/keranjang', 'Keranjang'],
   ['/akun/peminjaman', 'Peminjaman'],
   ['/akun/aktivitas', 'Aktivitas'],

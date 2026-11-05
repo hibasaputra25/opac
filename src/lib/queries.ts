@@ -515,11 +515,28 @@ export function getFacets(params: SearchParams) {
 export function getBook(id: number) {
   const [book] = hydrateBooks([id]);
   if (!book) return undefined;
-  const extra = one<{ description: string | null; origin: string | null }>(
-    'SELECT description, origin FROM books WHERE id = ?',
+  const extra = one<{
+    description: string | null;
+    origin: string | null;
+    pages: number | null;
+    size: string | null;
+    issn: string | null;
+    digital_url: string | null;
+    collection_type: string | null;
+  }>(
+    'SELECT description, origin, pages, size, issn, digital_url, collection_type FROM books WHERE id = ?',
     [id],
   );
-  return { ...book, description: extra?.description ?? null, origin: extra?.origin ?? null };
+  return {
+    ...book,
+    description: extra?.description ?? null,
+    origin: extra?.origin ?? null,
+    pages: extra?.pages ?? null,
+    size: extra?.size ?? null,
+    issn: extra?.issn ?? null,
+    digital_url: extra?.digital_url ?? null,
+    collection_type: extra?.collection_type ?? null,
+  };
 }
 
 export type ItemRow = {
@@ -529,6 +546,7 @@ export type ItemRow = {
   status: string;
   acquisition: string | null;
   call_number: string | null;
+  shelf: string | null;
   location_name: string | null;
   location_code: string | null;
 };
@@ -536,7 +554,7 @@ export type ItemRow = {
 export function getBookItems(bookId: number) {
   return all<ItemRow>(
     `SELECT i.id, i.barcode, i.register_no, i.status, i.acquisition, i.call_number,
-            l.name AS location_name, l.code AS location_code
+            i.shelf, l.name AS location_name, l.code AS location_code
        FROM items i LEFT JOIN locations l ON l.id = i.location_id
       WHERE i.book_id = ?
       ORDER BY l.name ASC, i.barcode ASC`,

@@ -59,6 +59,16 @@ const NAV: NavItem[] = [
     ),
   },
   {
+    href: '/ebooks',
+    label: 'E-Books',
+    icon: icon(
+      <>
+        <rect x="4" y="3" width="16" height="18" rx="2.5" />
+        <path d="M8 7.5h8M8 11h8M8 14.5h4" />
+      </>,
+    ),
+  },
+  {
     href: '/akun/keranjang',
     label: 'Keranjang',
     auth: true,
