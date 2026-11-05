@@ -28,12 +28,12 @@ export default async function CatalogPage({
 
   return (
     <div className="min-h-screen">
-      {/* Pencarian */}
-      <form action="/katalog" method="GET">
+      {/* Baris 1: pencarian (kiri, lebar) + tombol filter (kanan) */}
+      <form action="/katalog" method="GET" className="flex items-center gap-2">
         <label htmlFor="search-books" className="sr-only">
           Cari koleksi
         </label>
-        <div className="relative">
+        <div className="relative min-w-0 flex-1">
           <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-gray-400">
             <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="11" cy="11" r="7" />
@@ -57,19 +57,17 @@ export default async function CatalogPage({
           {query.yearFrom && <input type="hidden" name="yearFrom" value={query.yearFrom} />}
           {query.yearTo && <input type="hidden" name="yearTo" value={query.yearTo} />}
         </div>
+
+        <FilterModal query={query} facets={facets} />
       </form>
 
-      {/* Toolbar: filter + view toggle + jumlah hasil */}
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <FilterModal query={query} facets={facets} />
-          <ViewToggle view={query.view ?? 'grid'} query={query} />
-        </div>
-
+      {/* Baris 2: jumlah hasil (kiri) + toggle grid/daftar (kanan) */}
+      <div className="mt-2.5 flex items-center justify-between gap-2">
         <p className="shrink-0 text-xs text-gray-400">
           <span className="font-bold text-gray-700">{result.total.toLocaleString('id-ID')}</span>{' '}
           koleksi
         </p>
+        <ViewToggle view={query.view ?? 'grid'} query={query} />
       </div>
 
       <ActiveFilterChips query={query} facets={facets} />
