@@ -1,14 +1,18 @@
 import Link from 'next/link';
-import { BookCard } from '@/components/ui/book-card';
-import { getNewBooks, getTopSubjects, getLocations } from '@/lib/queries';
+import { CatalogGrid } from '@/components/ui/catalog-grid';
+import { getTopSubjects, getLocations } from '@/lib/queries';
+import { getRecommendations, readUserRef } from '@/lib/recommendations';
 
 export const dynamic = 'force-dynamic';
 
-const RECOMMEND_TABS = ['Direkomendasikan', 'Manajemen', 'Ekonomi', 'Psikologi', 'Teknik'];
+const RECOMMEND_TABS = ['Manajemen', 'Ekonomi', 'Psikologi', 'Teknik'];
 
 export default async function HomePage() {
-  const [newBooks, subjects, locations] = await Promise.all([
-    Promise.resolve(getNewBooks(8)),
+  const userRef = await readUserRef();
+  const { books: recommended, personalized } = getRecommendations(userRef, 8);
+
+  const [, subjects, locations] = await Promise.all([
+    Promise.resolve(recommended),
     Promise.resolve(getTopSubjects(6)),
     Promise.resolve(getLocations()),
   ]);
@@ -19,9 +23,13 @@ export default async function HomePage() {
       <section className="mb-8">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <h3 className="text-base font-bold lg:text-xl">Rekomendasi Buku</h3>
+            <h3 className="text-base font-bold lg:text-xl">
+              {personalized ? 'Rekomendasi untuk Kamu' : 'Koleksi Terbaru'}
+            </h3>
             <p className="mt-1 hidden text-xs text-gray-500 lg:block lg:text-sm">
-              Temukan inspirasi baca kamu!
+              {personalized
+                ? 'Berbagi subjek dengan koleksi yang kamu lihat, sukai, atau pinjam.'
+                : 'Temukan inspirasi baca kamu!'}
             </p>
           </div>
           <Link
@@ -33,25 +41,19 @@ export default async function HomePage() {
         </div>
 
         <div className="no-scrollbar mt-3 flex gap-2 overflow-x-auto pb-1">
-          {RECOMMEND_TABS.map((tab, index) => (
+          {RECOMMEND_TABS.map((tab) => (
             <Link
               key={tab}
-              href={index === 0 ? '/katalog?sort=newest' : `/katalog?q=${encodeURIComponent(tab)}`}
-              className={`shrink-0 rounded-lg px-3 py-1 text-xs font-medium ${
-                index === 0
-                  ? 'bg-primary-500 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-primary-100 hover:text-primary-700'
-              }`}
+              href={`/katalog?q=${encodeURIComponent(tab)}`}
+              className="shrink-0 rounded-lg px-3 py-1 text-xs font-medium text-gray-600 hover:bg-primary-100 hover:text-primary-700"
             >
               {tab}
             </Link>
           ))}
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
-          {newBooks.map((book) => (
-            <BookCard key={book.id} book={book} />
-          ))}
+        <div className="mt-4">
+          <CatalogGrid books={recommended} />
         </div>
       </section>
 

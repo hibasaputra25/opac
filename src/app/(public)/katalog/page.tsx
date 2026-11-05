@@ -5,6 +5,7 @@ import { FilterModal } from '@/components/ui/filter-modal';
 import { Pagination } from '@/components/ui/pagination';
 import { SubjectChips, ActiveFilterChips } from '@/components/ui/subject-chips';
 import { getFacets, searchBooks } from '@/lib/queries';
+import { trackSearch } from '@/lib/recommendations';
 import {
   buildQuery,
   parseCatalogParams,
@@ -25,6 +26,9 @@ export default async function CatalogPage({
 
   const result = searchBooks({ ...query, perPage });
   const facets = getFacets(query);
+
+  // Rekam pencarian untuk rekomendasi personal (best-effort).
+  if (query.q) trackSearch(query.q, result.total);
 
   return (
     <div className="min-h-screen">

@@ -42,7 +42,7 @@ export type SearchParams = {
  * Dipisah dari query pencarian agar subquery hanya dieksekusi untuk
  * baris yang benar-benar ditampilkan (bukan seluruh 36 ribu judul).
  */
-function hydrateBooks(ids: number[]): BookListItem[] {
+export function hydrateBooks(ids: number[]): BookListItem[] {
   if (!ids.length) return [];
 
   const placeholders = ids.map(() => '?').join(',');

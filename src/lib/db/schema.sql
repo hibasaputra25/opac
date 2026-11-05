@@ -313,7 +313,19 @@ CREATE VIRTUAL TABLE IF NOT EXISTS books_fts USING fts5(
 
 CREATE TABLE IF NOT EXISTS search_logs (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_ref   TEXT,
   keyword    TEXT,
   result_cnt INTEGER,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- Riwayat kunjungan halaman detail buku - dasar rekomendasi personal.
+-- user_ref = user id (anggota) atau cookie anonim (UUID) pengunjung.
+CREATE TABLE IF NOT EXISTS book_views (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  book_id    INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+  user_ref   TEXT NOT NULL,
+  viewed_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_book_views_ref ON book_views(user_ref, viewed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_book_views_book ON book_views(book_id);

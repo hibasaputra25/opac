@@ -10,6 +10,7 @@ import { FavoriteButton } from './favorite-button';
 import { ShareButton } from './share-button';
 import { CartButton } from './cart-button';
 import { isBookInCart } from '@/lib/cart';
+import { trackBookView } from '@/lib/recommendations';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,6 +35,9 @@ export default async function BookDetailPage({ params }: { params: Promise<{ id:
 
   const book = getBook(bookId);
   if (!book) notFound();
+
+  // Rekam kunjungan untuk rekomendasi personal (tidak menunda render).
+  await trackBookView(bookId);
 
   const items = getBookItems(bookId);
   const related = getRelatedBooks(bookId, 4);
