@@ -43,7 +43,7 @@ export function FilterModal({ query, facets }: Props) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex shrink-0 items-center gap-2 rounded-lg border border-primary-500 py-1.5 px-3 text-xs font-medium text-primary-600 transition hover:bg-primary-50"
+        className="flex shrink-0 items-center gap-2 self-stretch rounded-lg border border-primary-500 px-3.5 text-sm font-medium text-primary-600 transition hover:bg-primary-50"
         aria-haspopup="dialog"
       >
         <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2">

@@ -60,7 +60,6 @@ export default async function CatalogPage({
 
         <FilterModal query={query} facets={facets} />
       </form>
-
       {/* Baris 2: jumlah hasil (kiri) + toggle grid/daftar (kanan) */}
       <div className="mt-2.5 flex items-center justify-between gap-2">
         <p className="shrink-0 text-xs text-gray-400">
@@ -138,6 +137,9 @@ export default async function CatalogPage({
  * dengan tampilannya).
  */
 function ViewToggle({ view, query }: { view: 'grid' | 'list'; query: CatalogQuery }) {
+  const GRID_PATH = 'M4 3.5h5v5H4zM11 3.5h5v5h-5zM4 11.5h5v5H4zM11 11.5h5v5h-5z';
+  const LIST_PATH = 'M3 5h14v1.8H3zM3 9.1h14v1.8H3zM3 13.2h14v1.8H3z';
+
   const button = (target: 'grid' | 'list', active: boolean, label: string, path: string) => (
     <Link
       href={buildQuery(query, { view: target === 'grid' ? undefined : target, page: 1 })}
@@ -151,25 +153,15 @@ function ViewToggle({ view, query }: { view: 'grid' | 'list'; query: CatalogQuer
       }`}
     >
       <svg viewBox="0 0 20 20" className="h-4 w-4" fill="currentColor" aria-hidden="true">
-        {path}
+        <path d={path} />
       </svg>
     </Link>
   );
 
   return (
     <div className="flex items-center gap-1.5" role="group" aria-label="Mode tampilan">
-      {button(
-        'grid',
-        view === 'grid',
-        'Tampilan grid',
-        'M4 3.5h5v5H4zM11 3.5h5v5h-5zM4 11.5h5v5H4zM11 11.5h5v5h-5z',
-      )}
-      {button(
-        'list',
-        view === 'list',
-        'Tampilan daftar',
-        'M3 5h14v1.8H3zM3 9.1h14v1.8H3zM3 13.2h14v1.8H3z',
-      )}
+      {button('grid', view === 'grid', 'Tampilan grid', GRID_PATH)}
+      {button('list', view === 'list', 'Tampilan daftar', LIST_PATH)}
     </div>
   );
 }
