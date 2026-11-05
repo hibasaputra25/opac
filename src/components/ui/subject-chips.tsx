@@ -14,25 +14,47 @@ type Facets = {
  * Daftar chip subjek di atas grid (pola Jaklitera): tautan cepat satu klik,
  * digeser horizontal bila melebihi lebar layar.
  *
- * Chip adalah satu-satunya indikator filter subjek di luar modal: menyala
- * (biru) bila subjeknya terpilih, klik lagi untuk melepas. Hanya 7 subjek
- * terpopuler â€” baris pendek selalu muat di desktop tanpa perlu menggeser,
- * dan pilihan lengkap tetap tersedia di modal Filter.
+ * Terdiri dari dua kelompok, berdampingan dalam satu baris scroll:
+ * 1. Subjek terpilih yang di luar 7 besar — "disuntik" paling kiri, menyala,
+ *    klik lagi untuk melepas lalu chip-nya lenyap (kembali ke 7 default).
+ * 2. 7 subjek terpopuler — menyala bila subjeknya terpilih.
+ *
+ * Pilihan lengkap tetap tersedia di modal Filter.
  */
 export function SubjectChips({ query, subjects }: { query: CatalogQuery; subjects: Facet[] }) {
-  if (!subjects.length) return null;
   const active = parseMulti(query.subject);
+  const defaults = subjects.slice(0, 7);
+  const defaultValues = new Set(defaults.map((s) => s.value));
+
+  // Subjek terpilih yang tidak termasuk 7 besar - suntik paling awal.
+  const injected = active
+    .filter((value) => !defaultValues.has(value))
+    .map((value) => ({
+      value,
+      label: subjects.find((s) => s.value === value)?.label ?? value,
+      isActive: true,
+    }));
+
+  const chips = [
+    ...injected,
+    ...defaults.map((subject) => ({
+      value: subject.value,
+      label: subject.label,
+      isActive: active.includes(subject.value),
+    })),
+  ];
+
+  if (!chips.length) return null;
 
   return (
     <div className="no-scrollbar -mx-1 flex items-center gap-2 overflow-x-auto px-1 py-0.5">
-      {subjects.slice(0, 7).map((subject) => {
-        const isActive = active.includes(subject.value);
+      {chips.map(({ value, label, isActive }) => {
         const next = isActive
-          ? active.filter((s) => s !== subject.value)
-          : [...active, subject.value];
+          ? active.filter((s) => s !== value)
+          : [...active, value];
         return (
           <Link
-            key={subject.value}
+            key={value}
             href={buildQuery(query, {
               subject: next.length ? next.join(',') : undefined,
               page: 1,
@@ -44,7 +66,7 @@ export function SubjectChips({ query, subjects }: { query: CatalogQuery; subject
                 : 'border-gray-200 bg-gray-50 text-gray-500 hover:border-orange-400 hover:bg-orange-50 hover:text-orange-600'
             }`}
           >
-            {subject.label}
+            {label}
           </Link>
         );
       })}
